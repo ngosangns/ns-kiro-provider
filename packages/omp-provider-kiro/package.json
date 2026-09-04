@@ -1,7 +1,7 @@
 {
   "name": "ns-omp-provider-kiro",
-  "version": "0.1.0",
-  "description": "OMP extension for the Kiro API (AWS CodeWhisperer/Q) \u2014 kiro-cli-verified models with credential reuse",
+  "version": "0.1.1",
+  "description": "OMP (oh-my-pi) provider plugin: adds Kiro (AWS CodeWhisperer/Q) models via your kiro-cli login",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

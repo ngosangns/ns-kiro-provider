@@ -1,7 +1,7 @@
 {
   "name": "ns-dsh-llm-kiro",
-  "version": "0.1.0",
-  "description": "DeepSeek Harness LLM adapter for the Kiro API (AWS CodeWhisperer/Q)",
+  "version": "0.1.1",
+  "description": "DeepSeek Harness (dsh) LLM adapter adding Kiro (AWS CodeWhisperer/Q) as a model provider",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
