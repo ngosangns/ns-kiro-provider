@@ -75,7 +75,7 @@ import {
 import { TRUNCATION_NOTICE, wasPreviousResponseTruncated } from "./truncation.js";
 import type { KiroEffort, KiroMessage, KiroStreamEvent, KiroTool, KiroUsage } from "./types.js";
 
-const CAPACITY_LOG_DIR = join(homedir(), ".kiro-providers", "logs");
+const CAPACITY_LOG_DIR = join(homedir(), ".ns-kiro-provider", "logs");
 const CAPACITY_LOG_FILE = join(CAPACITY_LOG_DIR, "capacity-retries.log");
 
 const eventStreamMarshaller = new UniversalEventStreamMarshaller({

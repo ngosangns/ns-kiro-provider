@@ -3,7 +3,7 @@
 Kiro (AWS CodeWhisperer/Q) models in [OMP](https://github.com/can1357/oh-my-pi).
 
 Not on npm yet — install from a clone of
-[kiro-providers](https://github.com/ngosangns/kiro-providers):
+[ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider):
 
 ```bash
 pnpm install && pnpm -r build
@@ -40,6 +40,6 @@ upstream shows up without a release here.
 - Usage (`/settings`) reports the account's Kiro credit balance.
 - `KIRO_API_KEY` is read as a fallback when no session is stored.
 - `KIRO_DEBUG=1` writes a full request/response trace to
-  `~/.kiro-providers/logs/kiro-debug.log`, with credentials redacted.
+  `~/.ns-kiro-provider/logs/kiro-debug.log`, with credentials redacted.
 
-Part of [kiro-providers](https://github.com/ngosangns/kiro-providers).
+Part of [ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider).

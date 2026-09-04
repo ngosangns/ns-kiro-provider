@@ -3,12 +3,12 @@
 The Kiro (AWS CodeWhisperer/Q) protocol, with no host types in it.
 
 This package is the shared half of
-[kiro-providers](https://github.com/ngosangns/kiro-providers): everything a Kiro
-client needs that is not specific to one coding agent.
+[ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider): everything a
+Kiro client needs that is not specific to one coding agent.
 
 - **Endpoints** — SSO region to management/runtime host resolution.
 - **Model catalog** — the bootstrap list, the authenticated regional catalog,
-  and a validated on-disk cache at `~/.kiro-providers-models-cache.json`.
+  and a validated on-disk cache at `~/.ns-kiro-provider-models-cache.json`.
 - **Credentials** — reads the kiro-cli SQLite store and the Kiro IDE token file,
   refreshes IDC / desktop / external-IdP / API-key sessions, and writes
   refreshes back so kiro-cli stays on the same token.

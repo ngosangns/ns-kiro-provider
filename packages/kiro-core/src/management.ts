@@ -298,7 +298,7 @@ export async function getUsageLimits<TResponse>(
         Accept: "application/json",
         ...kiroAuthHeaders(auth.accessToken),
         ...kiroTokenTypeHeaders(auth.accessToken),
-        "User-Agent": "kiro-providers",
+        "User-Agent": "ns-kiro-provider",
       },
     });
   } catch (error) {

@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ngosangns/kiro-providers.git",
+    "url": "git+https://github.com/ngosangns/ns-kiro-provider.git",
     "directory": "packages/omp-provider-kiro"
   },
   "keywords": [

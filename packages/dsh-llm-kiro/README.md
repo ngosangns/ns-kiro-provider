@@ -10,7 +10,7 @@ registers a real `LlmAdapter` rather than a profile on a generic one.
 ## Install
 
 Not on npm yet — install from a clone of
-[kiro-providers](https://github.com/ngosangns/kiro-providers):
+[ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider):
 
 ```bash
 kiro-cli login
@@ -67,4 +67,4 @@ dsh --profile <profile> "what changed in this repo?"
   been delivered: the Harness assembler cannot un-deliver a block, so a response
   already streamed out is settled rather than replayed.
 
-Part of [kiro-providers](https://github.com/ngosangns/kiro-providers).
+Part of [ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider).

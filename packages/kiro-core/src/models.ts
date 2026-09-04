@@ -11,14 +11,14 @@ import { KIRO_EFFORT_ORDER, type KiroEffort, type KiroModelSpec } from "./types.
 export { resolveApiRegion } from "./endpoints.js";
 
 export const KIRO_MANAGEMENT_CACHE_VERSION = 1;
-export const KIRO_MANAGEMENT_CACHE_SOURCE = "kiro-providers-management";
+export const KIRO_MANAGEMENT_CACHE_SOURCE = "ns-kiro-provider-management";
 /**
  * Deliberately not `~/.kiro-management-models-cache.json`: that path belongs to
  * pi-provider-kiro, whose cached rows carry pi-ai model fields this package does
  * not write. Sharing it would make each tool reject the other's cache as
  * malformed and refetch on every call.
  */
-export const KIRO_MANAGEMENT_CACHE_PATH = join(homedir(), ".kiro-providers-models-cache.json");
+export const KIRO_MANAGEMENT_CACHE_PATH = join(homedir(), ".ns-kiro-provider-models-cache.json");
 
 const CACHE_MAX_AGE_MS = 3600_000;
 const DEFAULT_CONTEXT_WINDOW = 200_000;

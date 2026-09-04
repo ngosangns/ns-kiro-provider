@@ -1,12 +1,12 @@
 {
-  "name": "kiro-providers",
+  "name": "ns-kiro-provider",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ngosangns/kiro-providers.git"
+    "url": "git+https://github.com/ngosangns/ns-kiro-provider.git"
   },
   "scripts": {
     "build": "pnpm -r --filter './packages/**' build",

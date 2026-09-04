@@ -1,4 +1,4 @@
-# kiro-providers
+# ns-kiro-provider
 
 Kiro (AWS CodeWhisperer/Q) as a model provider for two coding agents:
 [OMP](https://github.com/can1357/oh-my-pi) and the
@@ -42,8 +42,8 @@ because kiro-cli does them. A Kiro API key (`ksk_…`) is accepted directly.
 Neither package is on npm yet, so both install from a clone:
 
 ```bash
-git clone git@github.com:ngosangns/kiro-providers.git
-cd kiro-providers && pnpm install && pnpm -r build
+git clone git@github.com:ngosangns/ns-kiro-provider.git
+cd ns-kiro-provider && pnpm install && pnpm -r build
 ```
 
 ## OMP

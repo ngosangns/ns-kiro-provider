@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 const ENABLED = !!process.env.KIRO_DEBUG && process.env.KIRO_DEBUG !== "0";
-const LOG_FILE = process.env.KIRO_DEBUG_LOG || join(homedir(), ".kiro-providers", "logs", "kiro-debug.log");
+const LOG_FILE = process.env.KIRO_DEBUG_LOG || join(homedir(), ".ns-kiro-provider", "logs", "kiro-debug.log");
 
 let dirReady = false;
 
