@@ -6,6 +6,9 @@ This package is the shared half of
 [ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider): everything a
 Kiro client needs that is not specific to one coding agent.
 
+Published on npm as `ns-kiro-core`. Pulled in as a dependency by the two
+adapters below — not meant to be installed on its own.
+
 - **Endpoints** — SSO region to management/runtime host resolution.
 - **Model catalog** — the bootstrap list, the authenticated regional catalog,
   and a validated on-disk cache at `~/.ns-kiro-provider-models-cache.json`.

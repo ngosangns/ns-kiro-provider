@@ -9,7 +9,8 @@ registers a real `LlmAdapter` rather than a profile on a generic one.
 
 ## Install
 
-Not on npm yet — install from a clone of
+Published on npm as `ns-dsh-llm-kiro` — but the Harness plugin manager here
+resolves a local build path, not a registry name, so install from a clone of
 [ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider):
 
 ```bash
@@ -18,8 +19,10 @@ pnpm install && pnpm -r build
 dsh plugin --profile <profile> add link:$PWD/packages/dsh-llm-kiro
 ```
 
-`link:` rather than a tarball because `ns-dsh-llm-kiro` depends on the unpublished
-`ns-kiro-core`; the link resolves it out of the workspace.
+`link:` points the Harness at the local build from `pnpm -r build`, not a
+registry tarball. `ns-kiro-core` is published on npm now too, but since this
+flow runs from a clone rather than the registry, the link is what resolves it
+out of the workspace.
 
 Add the row to that profile's `cordis.patch.yml`:
 

@@ -39,7 +39,9 @@ because kiro-cli does them. A Kiro API key (`ksk_…`) is accepted directly.
 
 ## Install
 
-Neither package is on npm yet, so both install from a clone:
+All three packages are published on npm (`ns-kiro-core`, `ns-omp-provider-kiro`,
+`ns-dsh-llm-kiro`), but OMP and the DeepSeek Harness both resolve plugins from a
+local path rather than an npm package name, so this still installs from a clone:
 
 ```bash
 git clone git@github.com:ngosangns/ns-kiro-provider.git

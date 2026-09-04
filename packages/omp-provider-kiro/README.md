@@ -2,7 +2,8 @@
 
 Kiro (AWS CodeWhisperer/Q) models in [OMP](https://github.com/can1357/oh-my-pi).
 
-Not on npm yet — install from a clone of
+Published on npm as `ns-omp-provider-kiro` — but OMP installs plugins from a
+local path, not a registry name, so install from a clone of
 [ns-kiro-provider](https://github.com/ngosangns/ns-kiro-provider):
 
 ```bash
