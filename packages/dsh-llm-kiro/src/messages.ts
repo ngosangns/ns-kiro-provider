@@ -2,7 +2,7 @@
 
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 import type { ContentBlock, Message, ToolResultBlock } from "@deepseek-ai/dsh-llm";
-import type { KiroAssistantContent, KiroMessage, KiroUserContent } from "kiro-core";
+import type { KiroAssistantContent, KiroMessage, KiroUserContent } from "ns-kiro-core";
 
 /**
  * Harness images live in the attachment service, so their bytes are read here

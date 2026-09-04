@@ -10,7 +10,7 @@ import {
   kiroModels,
   resolveApiRegion,
   updateKiroModelsCache,
-} from "kiro-core";
+} from "ns-kiro-core";
 import { getKiroApiKey, loginKiro, refreshKiroCredentials, resolveRequestCredentials } from "./auth.js";
 import { kiroBaseUrl, toOmpModelConfig } from "./models.js";
 import { streamKiroForOmp } from "./stream.js";

@@ -20,7 +20,7 @@ import {
   type KiroTool,
   resolveApiRegion,
   streamKiro,
-} from "kiro-core";
+} from "ns-kiro-core";
 import { toLlmError } from "./errors.js";
 import { toKiroMessages } from "./messages.js";
 

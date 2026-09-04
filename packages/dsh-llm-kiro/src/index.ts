@@ -25,7 +25,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 import { LlmError } from "@deepseek-ai/dsh-llm";
 import z from "@deepseek-ai/schemastery";
-import { isExpired, type KiroCredentials, refreshKiroToken, resolveKiroCredentials } from "kiro-core";
+import { isExpired, type KiroCredentials, refreshKiroToken, resolveKiroCredentials } from "ns-kiro-core";
 import { KiroAdapter } from "./adapter.js";
 
 export { KiroAdapter, type KiroAdapterOptions } from "./adapter.js";

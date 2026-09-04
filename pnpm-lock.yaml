@@ -26,7 +26,7 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: ^3.18.1
         version: 3.18.2
-      kiro-core:
+      ns-kiro-core:
         specifier: workspace:*
         version: link:../kiro-core
     devDependencies:
@@ -64,7 +64,7 @@ importers:
 
   packages/omp-provider-kiro:
     dependencies:
-      kiro-core:
+      ns-kiro-core:
         specifier: workspace:*
         version: link:../kiro-core
     devDependencies:

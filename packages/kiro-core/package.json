@@ -1,5 +1,5 @@
 {
-  "name": "kiro-core",
+  "name": "ns-kiro-core",
   "version": "0.1.0",
   "description": "Host-neutral Kiro API core: credentials, model catalog, and the streaming wire protocol",
   "type": "module",

@@ -1,5 +1,5 @@
 {
-  "name": "omp-provider-kiro",
+  "name": "ns-omp-provider-kiro",
   "version": "0.1.0",
   "description": "OMP extension for the Kiro API (AWS CodeWhisperer/Q) \u2014 kiro-cli-verified models with credential reuse",
   "type": "module",
@@ -42,7 +42,7 @@
     "prepublishOnly": "pnpm run check && pnpm run build"
   },
   "dependencies": {
-    "kiro-core": "workspace:*"
+    "ns-kiro-core": "workspace:*"
   },
   "peerDependencies": {
     "@oh-my-pi/pi-ai": ">=18.1.0",

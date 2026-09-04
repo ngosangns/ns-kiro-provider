@@ -7,18 +7,18 @@ Kiro (AWS CodeWhisperer/Q) as a model provider for two coding agents:
 The two hosts share no plumbing — OMP registers a provider through its extension
 API, the Harness registers an `LlmAdapter` on a Cordis service — but they need
 the same thing underneath: Kiro's endpoints, its model catalog, its credentials,
-and its streaming wire protocol. That layer lives once, in `kiro-core`, and each
+and its streaming wire protocol. That layer lives once, in `ns-kiro-core`, and each
 adapter is thin.
 
 ```
-┌──────────────────────── kiro-core ─────────────────────────┐
-│ endpoints · model catalog + cache · kiro-cli credentials   │
+┌─────────────────────── ns-kiro-core ───────────────────────┐
+│  endpoints · model catalog + cache · kiro-cli credentials  │
 │ token refresh · AWS event-stream framing · thinking parser │
 │ tool-call recovery · history repair · retry classification │
 └───────────────┬────────────────────────────┬───────────────┘
                 │                            │
-     omp-provider-kiro                 dsh-llm-kiro
-   registerProvider("kiro")      registerAdapter(["kiro"], …)
+      ns-omp-provider-kiro            ns-dsh-llm-kiro
+    registerProvider("kiro")   registerAdapter(["kiro"], …)
                 │                            │
              omp 18.x                     dsh 0.1.x
 ```
@@ -68,7 +68,7 @@ Then add the row to that profile's `cordis.patch.yml`:
 ```yaml
 - insert:
     - id: llm-kiro
-      name: 'dsh-llm-kiro'
+      name: 'ns-dsh-llm-kiro'
       config:
         provider: kiro
 
@@ -85,9 +85,9 @@ the credential, which is what a single-account machine wants.
 
 | Package | What it is |
 | --- | --- |
-| [`kiro-core`](packages/kiro-core) | The Kiro protocol, with no host types in it |
-| [`omp-provider-kiro`](packages/omp-provider-kiro) | OMP extension |
-| [`dsh-llm-kiro`](packages/dsh-llm-kiro) | DeepSeek Harness Cordis plugin |
+| [`ns-kiro-core`](packages/kiro-core) | The Kiro protocol, with no host types in it |
+| [`ns-omp-provider-kiro`](packages/omp-provider-kiro) | OMP extension |
+| [`ns-dsh-llm-kiro`](packages/dsh-llm-kiro) | DeepSeek Harness Cordis plugin |
 
 ## Development
 

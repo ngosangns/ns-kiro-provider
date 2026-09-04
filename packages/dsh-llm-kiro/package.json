@@ -1,5 +1,5 @@
 {
-  "name": "dsh-llm-kiro",
+  "name": "ns-dsh-llm-kiro",
   "version": "0.1.0",
   "description": "DeepSeek Harness LLM adapter for the Kiro API (AWS CodeWhisperer/Q)",
   "type": "module",
@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
-    "kiro-core": "workspace:*"
+    "ns-kiro-core": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

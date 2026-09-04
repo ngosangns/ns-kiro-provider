@@ -2,7 +2,7 @@
 // ABOUTME: One direction only — responses travel back as stream events, not messages.
 
 import type { ImageContent, Message, TextContent, Tool, ToolCall } from "@oh-my-pi/pi-ai";
-import type { KiroAssistantContent, KiroMessage, KiroTool, KiroUserContent } from "kiro-core";
+import type { KiroAssistantContent, KiroMessage, KiroTool, KiroUserContent } from "ns-kiro-core";
 
 function userContent(content: Message["content"]): KiroUserContent[] {
   if (typeof content === "string") return content ? [{ type: "text", text: content }] : [];

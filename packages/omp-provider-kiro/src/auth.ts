@@ -8,7 +8,7 @@ import {
   refreshKiroToken,
   resolveApiRegion,
   resolveKiroCredentials,
-} from "kiro-core";
+} from "ns-kiro-core";
 
 const NO_SESSION_MESSAGE =
   "No Kiro session found. Sign in with `kiro-cli login` (Builder ID, IAM Identity Center, Google, or GitHub), " +

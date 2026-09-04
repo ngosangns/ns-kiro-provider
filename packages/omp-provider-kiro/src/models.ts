@@ -1,7 +1,7 @@
 // ABOUTME: Projects the kiro-core catalog onto OMP's provider-model configuration.
 
 import type { Model } from "@oh-my-pi/pi-ai";
-import { getKiroEndpoints, type KiroModel } from "kiro-core";
+import { getKiroEndpoints, type KiroModel } from "ns-kiro-core";
 
 /** The subset of OMP's `ProviderModelConfig` this provider fills in. */
 export interface OmpKiroModelConfig {

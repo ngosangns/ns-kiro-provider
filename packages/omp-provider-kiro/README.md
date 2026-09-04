@@ -1,4 +1,4 @@
-# omp-provider-kiro
+# ns-omp-provider-kiro
 
 Kiro (AWS CodeWhisperer/Q) models in [OMP](https://github.com/can1357/oh-my-pi).
 

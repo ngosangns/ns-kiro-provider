@@ -1,6 +1,6 @@
 // ABOUTME: Tests the projection from Kiro account usage onto OMP's usage report.
 
-import type { KiroProviderUsage, KiroProviderUsageBucket } from "kiro-core";
+import type { KiroProviderUsage, KiroProviderUsageBucket } from "ns-kiro-core";
 import { describe, expect, it } from "vitest";
 import { toUsageReport } from "../src/usage.js";
 

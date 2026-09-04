@@ -9,17 +9,17 @@ pnpm workspace, three packages under `packages/`:
 
 | Package | What it is |
 | --- | --- |
-| [`kiro-core`](packages/kiro-core) | The Kiro (AWS CodeWhisperer/Q) protocol, with no host types in it — endpoints, model catalog + cache, kiro-cli/IDE credential handling and refresh, AWS event-stream framing, thinking-tag parsing, tool-call recovery, history repair, retry classification |
-| [`omp-provider-kiro`](packages/omp-provider-kiro) | Thin OMP extension: registers Kiro as a provider through OMP's extension API |
-| [`dsh-llm-kiro`](packages/dsh-llm-kiro) | Thin DeepSeek Harness Cordis plugin: registers Kiro as an `LlmAdapter` |
+| [`ns-kiro-core`](packages/kiro-core) | The Kiro (AWS CodeWhisperer/Q) protocol, with no host types in it — endpoints, model catalog + cache, kiro-cli/IDE credential handling and refresh, AWS event-stream framing, thinking-tag parsing, tool-call recovery, history repair, retry classification |
+| [`ns-omp-provider-kiro`](packages/omp-provider-kiro) | Thin OMP extension: registers Kiro as a provider through OMP's extension API |
+| [`ns-dsh-llm-kiro`](packages/dsh-llm-kiro) | Thin DeepSeek Harness Cordis plugin: registers Kiro as an `LlmAdapter` |
 
-`kiro-core` holds all the protocol logic. The two adapters only translate
-between their host's types and `kiro-core`'s neutral vocabulary (host messages
+`ns-kiro-core` holds all the protocol logic. The two adapters only translate
+between their host's types and `ns-kiro-core`'s neutral vocabulary (host messages
 in, host stream events out) — see the root README's architecture diagram for
 the shared-plumbing rationale. A new host adapter belongs alongside
-`omp-provider-kiro`/`dsh-llm-kiro` and should stay a thin translation layer;
+`ns-omp-provider-kiro`/`ns-dsh-llm-kiro` and should stay a thin translation layer;
 protocol changes (streaming, retries, credentials, model catalog) belong in
-`kiro-core`.
+`ns-kiro-core`.
 
 ## Prerequisites
 

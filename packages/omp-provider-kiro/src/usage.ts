@@ -1,7 +1,12 @@
 // ABOUTME: Projects Kiro's account usage onto OMP's normalized usage report.
 
 import type { UsageFetchParams, UsageProvider, UsageReport, UsageUnit } from "@oh-my-pi/pi-ai";
-import { fetchKiroUsage, type KiroCredentials, type KiroProviderUsage, type KiroProviderUsageBucket } from "kiro-core";
+import {
+  fetchKiroUsage,
+  type KiroCredentials,
+  type KiroProviderUsage,
+  type KiroProviderUsageBucket,
+} from "ns-kiro-core";
 
 /** Kiro reports credit consumption; anything else it names is passed through as unknown. */
 function toUsageUnit(unit: string | undefined): UsageUnit {

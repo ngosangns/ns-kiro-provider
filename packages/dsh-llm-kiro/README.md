@@ -1,4 +1,4 @@
-# dsh-llm-kiro
+# ns-dsh-llm-kiro
 
 Kiro (AWS CodeWhisperer/Q) as a provider route in the
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
@@ -18,15 +18,15 @@ pnpm install && pnpm -r build
 dsh plugin --profile <profile> add link:$PWD/packages/dsh-llm-kiro
 ```
 
-`link:` rather than a tarball because `dsh-llm-kiro` depends on the unpublished
-`kiro-core`; the link resolves it out of the workspace.
+`link:` rather than a tarball because `ns-dsh-llm-kiro` depends on the unpublished
+`ns-kiro-core`; the link resolves it out of the workspace.
 
 Add the row to that profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:
     - id: llm-kiro
-      name: 'dsh-llm-kiro'
+      name: 'ns-dsh-llm-kiro'
       config:
         provider: kiro
 

@@ -1,7 +1,7 @@
 // ABOUTME: Maps Kiro's failure vocabulary onto the Harness LlmError taxonomy.
 
 import { LlmError } from "@deepseek-ai/dsh-llm";
-import { isCapacityError, isNonRetryableBodyError, KIRO_REASON_CODES } from "kiro-core";
+import { isCapacityError, isNonRetryableBodyError, KIRO_REASON_CODES } from "ns-kiro-core";
 
 const STATUS_PATTERN = /Kiro API error: (\d{3})\b/;
 

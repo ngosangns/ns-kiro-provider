@@ -1,4 +1,4 @@
-# kiro-core
+# ns-kiro-core
 
 The Kiro (AWS CodeWhisperer/Q) protocol, with no host types in it.
 
@@ -23,7 +23,7 @@ Kiro client needs that is not specific to one coding agent.
 its own events:
 
 ```ts
-import { streamKiro, resolveKiroCredentials, getCachedModels } from "kiro-core";
+import { streamKiro, resolveKiroCredentials, getCachedModels } from "ns-kiro-core";
 
 const credentials = await resolveKiroCredentials();
 const model = getCachedModels("us-east-1").find((m) => m.id === "claude-sonnet-4-6");

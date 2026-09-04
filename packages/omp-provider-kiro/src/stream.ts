@@ -20,7 +20,7 @@ import {
   type KiroModel,
   kiroModels,
   streamKiro,
-} from "kiro-core";
+} from "ns-kiro-core";
 import { resolveRequestCredentials } from "./auth.js";
 import { toKiroMessages, toKiroTools } from "./messages.js";
 
