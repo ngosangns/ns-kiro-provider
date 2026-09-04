@@ -1,0 +1,64 @@
+{
+  "name": "omp-provider-kiro",
+  "version": "0.1.0",
+  "description": "OMP extension for the Kiro API (AWS CodeWhisperer/Q) \u2014 kiro-cli-verified models with credential reuse",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngosangns/kiro-providers.git",
+    "directory": "packages/omp-provider-kiro"
+  },
+  "keywords": [
+    "omp",
+    "omp-plugin",
+    "oh-my-pi",
+    "pi",
+    "kiro",
+    "aws",
+    "codewhisperer",
+    "ai",
+    "provider"
+  ],
+  "omp": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --banner:js=\"import{createRequire as __kiroCreateRequire}from'node:module';const require=__kiroCreateRequire(import.meta.url);\" --external:@oh-my-pi/pi-ai --external:@oh-my-pi/pi-catalog --external:@oh-my-pi/pi-coding-agent --external:@oh-my-pi/pi-tui && tsc -p tsconfig.json --emitDeclarationOnly",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "prepublishOnly": "pnpm run check && pnpm run build"
+  },
+  "dependencies": {
+    "kiro-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@oh-my-pi/pi-ai": ">=18.1.0",
+    "@oh-my-pi/pi-coding-agent": ">=18.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@oh-my-pi/pi-ai": {
+      "optional": true
+    },
+    "@oh-my-pi/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@oh-my-pi/pi-ai": "18.1.5",
+    "@oh-my-pi/pi-coding-agent": "18.1.5",
+    "@types/node": "^22.10.0"
+  }
+}

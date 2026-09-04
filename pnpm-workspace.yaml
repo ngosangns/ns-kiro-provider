@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+
+# The omp host packages are here for their type declarations only — the bundle
+# marks them external — so their native transitive builds are dead weight.
+allowBuilds:
+  esbuild: true
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false

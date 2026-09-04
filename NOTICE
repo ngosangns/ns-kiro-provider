@@ -1,0 +1,14 @@
+kiro-providers
+Copyright (c) 2026 ngosangns
+
+This product includes software derived from pi-provider-kiro
+(https://github.com/mikeyobrien/pi-provider-kiro), Copyright (c) Mike O'Brien,
+licensed under the MIT License.
+
+`packages/kiro-core` is a port of that project's Kiro protocol layer — endpoint
+resolution, the model catalog and its cache, kiro-cli credential reuse and token
+refresh, AWS event-stream parsing, thinking and tool-call parsing, history
+validation and repair, and retry classification. The port replaces the pi-ai
+message and event types with a host-neutral vocabulary so the same protocol code
+can serve both OMP and the DeepSeek Harness; the protocol behaviour itself is
+upstream's.

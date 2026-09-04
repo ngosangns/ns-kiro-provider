@@ -1,0 +1,32 @@
+{
+  "name": "kiro-core",
+  "version": "0.1.0",
+  "description": "Host-neutral Kiro API core: credentials, model catalog, and the streaming wire protocol",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "prepublishOnly": "pnpm run check && pnpm run build"
+  },
+  "dependencies": {
+    "@smithy/core": "^3.24.5",
+    "js-tiktoken": "^1.0.21"
+  },
+  "devDependencies": {
+    "@smithy/types": "^4.17.2",
+    "@types/node": "^22.10.0"
+  }
+}
