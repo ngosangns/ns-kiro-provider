@@ -91,13 +91,8 @@ the credential, which is what a single-account machine wants.
 
 ## Development
 
-```bash
-pnpm install
-pnpm -r build
-pnpm -r check
-pnpm test
-pnpm lint
-```
+See [DEVELOPER.md](DEVELOPER.md) for building from source, running tests, and
+contributing.
 
 ## What this is not
 
