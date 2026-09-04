@@ -158,9 +158,12 @@ vào `packages/omp-provider-kiro` trừ khi OMP 18.x thật sự đã chuyển.
 Test upstream ánh xạ 1:1 sang `packages/kiro-core/test/`, trừ các mục trong
 `notPorted`. Cạm bẫy đáng chú ý:
 
-- **`test/stream.test.ts` không có bản port.** Commit upstream chạm `src/stream.ts`
-  không có lưới an toàn ở đây. Hoặc tự verify bằng tay, hoặc viết test mới cho
-  vocabulary neutral — nêu rõ đã chọn cách nào trong báo cáo.
+- **`test/stream.test.ts` không port 1:1.** `packages/kiro-core/test/stream.test.ts`
+  là bộ test độc lập theo vocabulary neutral, không cùng cấu trúc với upstream
+  (~4400 dòng, bám vào `Context`/`AssistantMessageEvent` của pi, và dùng event
+  `error` trong khi bản port `throw`). Khi upstream đụng `src/stream.ts`: đọc test
+  upstream để lấy *ý định*, rồi thêm case tương ứng vào bộ local. Chạy
+  `npx vitest run packages/kiro-core/test/stream.test.ts` sau mỗi lần port.
 - `test/registration.test.ts` và `test/packaging.test.ts` của upstream kiểm tra
   đăng ký extension của pi; phần tương đương nằm ở `packages/omp-provider-kiro/test/packaging.test.ts`
   và `packages/dsh-llm-kiro/test/packaging.test.ts`, hình dạng đã khác.

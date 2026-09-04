@@ -45,7 +45,7 @@
     },
     {
       "path": "test/stream.test.ts",
-      "reason": "Chưa có bản port. Thay đổi upstream trong src/stream.ts phải tự verify bằng tay hoặc viết test mới trong packages/kiro-core/test/."
+      "reason": "Không port 1:1. packages/kiro-core/test/stream.test.ts là bộ test độc lập viết theo vocabulary neutral, phủ cùng module nhưng không cùng cấu trúc (upstream ~4400 dòng, bám vào Context/AssistantMessageEvent của pi, và dùng event 'error' trong khi bản port throw). Khi upstream đụng src/stream.ts: đọc test upstream để lấy ý định, rồi thêm case tương ứng vào bộ local thay vì copy."
     },
     {
       "path": "test/login.test.ts",
