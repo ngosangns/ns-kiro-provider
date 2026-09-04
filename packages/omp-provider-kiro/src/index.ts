@@ -79,12 +79,8 @@ export default function (pi: ExtensionAPI) {
             api: "kiro-api" as Api,
             provider: "kiro",
             baseUrl: kiroBaseUrl(region),
-            kiroModelId: model.kiroModelId,
             kiroRegion: region,
             ...(kiroCredentials.profileArn ? { kiroProfileArn: kiroCredentials.profileArn } : {}),
-            ...(model.additionalModelRequestFieldsSchema
-              ? { additionalModelRequestFieldsSchema: model.additionalModelRequestFieldsSchema }
-              : {}),
           }),
         );
         return [...others, ...(kiro as unknown as Model<Api>[])];

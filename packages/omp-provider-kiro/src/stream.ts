@@ -15,17 +15,17 @@ import type {
 import * as PiAi from "@oh-my-pi/pi-ai";
 import {
   formatSafeError,
+  getCachedModels,
   getKiroRegionFromEndpoint,
   type KiroEffort,
   type KiroModel,
-  kiroModels,
   streamKiro,
 } from "ns-kiro-core";
 import { resolveRequestCredentials } from "./auth.js";
 import { toKiroMessages, toKiroTools } from "./messages.js";
 
 /** Catalog metadata this provider attaches to the models it registers. */
-type KiroBackedModel = Model<Api> & {
+export type KiroBackedModel = Model<Api> & {
   kiroModelId?: string;
   kiroRegion?: string;
   kiroProfileArn?: string;
@@ -66,14 +66,24 @@ const ZERO_USAGE = () => ({
  * registered, so the catalog entry is looked up again here rather than carried
  * through: the ladder and the request-fields schema decide effort mapping, and
  * a request must use the same ones the catalog advertised.
+ *
+ * Looks up the region's authenticated cache, not the static bootstrap list:
+ * models discovered only through the authenticated catalog (no bootstrap
+ * entry) would otherwise miss this lookup and fall through to guessing a wire
+ * id from the dash-spelled local `id`, which Kiro rejects as `INVALID_MODEL_ID`.
  */
-function toKiroModel(model: KiroBackedModel, catalog: KiroModel[]): KiroModel {
-  const region = model.kiroRegion ?? getKiroRegionFromEndpoint(model.baseUrl) ?? "us-east-1";
-  const known = catalog.find((candidate) => candidate.id === model.id);
+export function toKiroModel(model: KiroBackedModel, region: string): KiroModel {
+  const known = getCachedModels(region).find((candidate) => candidate.id === model.id);
   return {
     ...(known ?? {
       id: model.id,
-      kiroModelId: model.kiroModelId ?? model.id,
+      // No fallback to `model.id`: that dash-spelled local id is not a valid
+      // Kiro wire id. Falls back to `""` rather than `model.id` — falsy, so
+      // `resolveKiroModel`'s `if (exactKiroModelId) return exactKiroModelId`
+      // treats it as no override and runs its own cache/bootstrap/dot-normalize
+      // resolution instead of being short-circuited by a value that is really
+      // just `model.id` again.
+      kiroModelId: model.kiroModelId ?? "",
       name: model.name,
       reasoning: model.reasoning,
       input: [...model.input],
@@ -123,8 +133,10 @@ export function streamKiroForOmp(
       };
       const at = (coreIndex: number): number | undefined => indexes.get(coreIndex);
 
+      const region =
+        (model as KiroBackedModel).kiroRegion ?? getKiroRegionFromEndpoint(model.baseUrl) ?? credentials.region;
       for await (const event of streamKiro({
-        model: toKiroModel(model as KiroBackedModel, kiroModels),
+        model: toKiroModel(model as KiroBackedModel, region),
         messages: toKiroMessages(context.messages),
         systemPrompt: context.systemPrompt?.join("\n\n"),
         tools: toKiroTools(context.tools),
