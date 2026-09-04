@@ -9,10 +9,17 @@ registers a real `LlmAdapter` rather than a profile on a generic one.
 
 ## Install
 
+Not on npm yet — install from a clone of
+[kiro-providers](https://github.com/ngosangns/kiro-providers):
+
 ```bash
 kiro-cli login
-dsh plugin --profile <profile> add dsh-llm-kiro
+pnpm install && pnpm -r build
+dsh plugin --profile <profile> add link:$PWD/packages/dsh-llm-kiro
 ```
+
+`link:` rather than a tarball because `dsh-llm-kiro` depends on the unpublished
+`kiro-core`; the link resolves it out of the workspace.
 
 Add the row to that profile's `cordis.patch.yml`:
 

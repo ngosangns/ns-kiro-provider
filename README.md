@@ -37,10 +37,19 @@ kiro-cli login
 Builder ID, IAM Identity Center, Google, GitHub, and enterprise OIDC all work,
 because kiro-cli does them. A Kiro API key (`ksk_…`) is accepted directly.
 
+## Install
+
+Neither package is on npm yet, so both install from a clone:
+
+```bash
+git clone git@github.com:ngosangns/kiro-providers.git
+cd kiro-providers && pnpm install && pnpm -r build
+```
+
 ## OMP
 
 ```bash
-omp plugin install omp-provider-kiro
+omp plugin install ./packages/omp-provider-kiro
 omp --model kiro/claude-sonnet-4-6
 ```
 
@@ -51,7 +60,7 @@ serves — the catalog is fetched from Kiro rather than hardcoded.
 ## DeepSeek Harness
 
 ```bash
-dsh plugin --profile <profile> add dsh-llm-kiro
+dsh plugin --profile <profile> add link:$PWD/packages/dsh-llm-kiro
 ```
 
 Then add the row to that profile's `cordis.patch.yml`:

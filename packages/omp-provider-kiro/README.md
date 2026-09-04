@@ -2,8 +2,12 @@
 
 Kiro (AWS CodeWhisperer/Q) models in [OMP](https://github.com/can1357/oh-my-pi).
 
+Not on npm yet — install from a clone of
+[kiro-providers](https://github.com/ngosangns/kiro-providers):
+
 ```bash
-omp plugin install omp-provider-kiro
+pnpm install && pnpm -r build
+omp plugin install ./packages/omp-provider-kiro
 ```
 
 Sign in once with kiro-cli — Builder ID, IAM Identity Center, Google, GitHub, or
