@@ -99,6 +99,15 @@ Script trả lời *cái gì đổi*. Trước khi port, cần biết *vì sao*:
 - Bug chỉ tồn tại vì cách pi cấu trúc message thì **không** port. Bug ở tầng wire
   của Kiro thì **luôn** port.
 
+### 2b. Kiểm tra `divergences` trước khi port
+
+`.upstream-sync.json` có mảng `divergences`: những chỗ bản port **cố ý** khác
+upstream, kèm lý do. Nếu commit đang xét chạm đúng file đó, đọc entry trước.
+
+Port đè lên một divergence sẽ âm thầm mang lại chính cái bug đã sửa. Khi upstream
+tự sửa cùng vấn đề theo cách khác, chọn một cách rồi cập nhật hoặc gỡ entry —
+đừng để cả hai cùng tồn tại.
+
 ### 3. Triage từng commit
 
 Đối chiếu output của script với bảng dưới, rồi quyết định port / bỏ / hoãn cho từng commit:

@@ -410,6 +410,9 @@ describe("streamKiro — tool calls", () => {
   });
 });
 
+// `qwen3-coder` stands in for a model the catalog leaves unmarked, where the
+// fallback is wanted. Models that emit native tool-use events carry
+// `recoverTextToolCalls: false` and are covered at the end of this block.
 describe("streamKiro — text-dialect tool-call recovery", () => {
   it("lifts a bracket-dialect call out of the prose and cleans the text", async () => {
     stubFetch(
@@ -455,6 +458,28 @@ describe("streamKiro — text-dialect tool-call recovery", () => {
     expect(ends).toHaveLength(1);
     expect(ends[0]).toMatchObject({ name: "write" });
     expect((events.find((e) => e.type === "text_end") as { text: string }).text).toContain("[Called");
+  });
+
+  it("does not lift bracket syntax a native-tool-call model merely quoted", async () => {
+    stubFetch(
+      makeOkResponse(
+        JSON.stringify({ content: 'You would write [Called read with args: {"path":"/tmp/a"}] to do that.' }) +
+          '{"contextUsagePercentage":10}',
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest({ model: makeModel({ recoverTextToolCalls: false }) })));
+
+    expect(events.some((e) => e.type === "tool_call_end")).toBe(false);
+    expect((events.find((e) => e.type === "text_end") as { text: string }).text).toContain("[Called read with args:");
+    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
+  });
+
+  it("does not lift quoted XML syntax into a shell call a native-tool-call model never made", async () => {
+    stubFetch(makeOkResponse(JSON.stringify({ content: RECORD_279_TEXT }) + '{"contextUsagePercentage":10}'));
+    const events = await collect(streamKiro(makeRequest({ model: makeModel({ recoverTextToolCalls: false }) })));
+
+    expect(events.some((e) => e.type === "tool_call_end")).toBe(false);
+    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
   });
 });
 

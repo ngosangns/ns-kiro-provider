@@ -885,7 +885,14 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
     // Without this, the turn ends `stop` with zero tool calls — the agent loop
     // sees a finished answer and an unattended session stalls with no error
     // recorded anywhere.
-    if (!sawAnyToolCalls && textBlockIndex !== null) {
+    //
+    // Models that emit native tool-use events opt out via
+    // `recoverTextToolCalls: false`. For them this pass has nothing to rescue
+    // and everything to break: prose that merely *quotes* the syntax — a model
+    // explaining how a tool is called — would be lifted into a real call the
+    // model never made. Absent means recover, so a model the catalog says
+    // nothing about keeps the fallback.
+    if (model.recoverTextToolCalls !== false && !sawAnyToolCalls && textBlockIndex !== null) {
       let text = blocks.getText(textBlockIndex);
       const recovered: Array<{ toolUseId: string; name: string; arguments: Record<string, unknown> }> = [];
       const bracketResult = parseBracketToolCalls(text);

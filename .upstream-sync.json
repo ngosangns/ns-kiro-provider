@@ -75,5 +75,15 @@
     "packages/kiro-core/src/cost.ts",
     "packages/omp-provider-kiro/src/**",
     "packages/dsh-llm-kiro/src/**"
+  ],
+  "divergences": [
+    {
+      "path": "packages/kiro-core/src/stream.ts",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-04",
+      "what": "Pass khôi phục tool call dạng text bị chặn khi model khai recoverTextToolCalls === false.",
+      "why": "Cả upstream lẫn bản port đều set field này (false cho mọi model Claude) nhưng không đọc nó ở stream.ts. Hậu quả: prose chỉ *trích dẫn* cú pháp — model giải thích cách gọi tool — bị nâng thành tool call thật mà model chưa từng phát ra. Đúng thứ comment trong models.ts nói cần tránh.",
+      "risk": "Nếu upstream tự sửa bug này theo cách khác, đừng port đè — đối chiếu trước. Test giữ hành vi: packages/kiro-core/test/stream.test.ts, hai case 'does not lift ... a native-tool-call model'."
+    }
   ]
 }
