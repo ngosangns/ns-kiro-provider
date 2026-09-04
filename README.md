@@ -40,8 +40,10 @@ because kiro-cli does them. A Kiro API key (`ksk_…`) is accepted directly.
 ## Install
 
 All three packages are published on npm (`ns-kiro-core`, `ns-omp-provider-kiro`,
-`ns-dsh-llm-kiro`), but OMP and the DeepSeek Harness both resolve plugins from a
-local path rather than an npm package name, so this still installs from a clone:
+`ns-dsh-llm-kiro`). Both adapters accept a plain npm package name for their
+install command — no clone or build required, see the per-package sections
+below. A clone is only needed to develop `ns-kiro-core` itself (not meant for
+direct install) or to run an adapter from a local build before it's released:
 
 ```bash
 git clone git@github.com:ngosangns/ns-kiro-provider.git
@@ -51,21 +53,25 @@ cd ns-kiro-provider && pnpm install && pnpm -r build
 ## OMP
 
 ```bash
-omp plugin install ./packages/omp-provider-kiro
+omp plugin install ns-omp-provider-kiro
 omp --model kiro/claude-sonnet-4-6
 ```
 
 `/login kiro` picks up the kiro-cli session, or prompts for an API key when
 there is none. `/model` then lists whatever your account's region actually
-serves — the catalog is fetched from Kiro rather than hardcoded.
+serves — the catalog is fetched from Kiro rather than hardcoded. See
+[the package README](packages/omp-provider-kiro) for version pinning and
+installing from a local build.
 
 ## DeepSeek Harness
 
 ```bash
-dsh plugin --profile <profile> add link:$PWD/packages/dsh-llm-kiro
+dsh plugin --profile <profile> add ns-dsh-llm-kiro
 ```
 
-Then add the row to that profile's `cordis.patch.yml`:
+See [the package README](packages/dsh-llm-kiro) for version pinning and
+installing from a local build. Then add the row to that profile's
+`cordis.patch.yml`:
 
 ```yaml
 - insert:
