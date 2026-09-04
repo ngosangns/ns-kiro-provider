@@ -1,0 +1,79 @@
+{
+  "_comment": "Baseline cho port ngữ nghĩa từ mikeyobrien/pi-provider-kiro. Quy trình: .claude/skills/sync-upstream-kiro/SKILL.md",
+  "upstream": {
+    "repo": "https://github.com/mikeyobrien/pi-provider-kiro",
+    "remote": "upstream",
+    "branch": "main"
+  },
+  "syncedCommit": "111a1b14682e34b30ec721fbce4e8f6d98986ec4",
+  "syncedTag": "v0.10.2",
+  "syncedAt": "2026-09-04",
+  "pathMapping": {
+    "src/bracket-tool-parser.ts": "packages/kiro-core/src/bracket-tool-parser.ts",
+    "src/debug.ts": "packages/kiro-core/src/debug.ts",
+    "src/effort.ts": "packages/kiro-core/src/effort.ts",
+    "src/endpoints.ts": "packages/kiro-core/src/endpoints.ts",
+    "src/event-parser.ts": "packages/kiro-core/src/event-parser.ts",
+    "src/history-validator.ts": "packages/kiro-core/src/history-validator.ts",
+    "src/history.ts": "packages/kiro-core/src/history.ts",
+    "src/index.ts": "packages/kiro-core/src/index.ts",
+    "src/invoke-tool-parser.ts": "packages/kiro-core/src/invoke-tool-parser.ts",
+    "src/kiro-cli.ts": "packages/kiro-core/src/kiro-cli.ts",
+    "src/kiro-ide.ts": "packages/kiro-core/src/kiro-ide.ts",
+    "src/management.ts": "packages/kiro-core/src/management.ts",
+    "src/models.ts": "packages/kiro-core/src/models.ts",
+    "src/oauth.ts": "packages/kiro-core/src/oauth.ts",
+    "src/retry.ts": "packages/kiro-core/src/retry.ts",
+    "src/stream.ts": "packages/kiro-core/src/stream.ts",
+    "src/thinking-parser.ts": "packages/kiro-core/src/thinking-parser.ts",
+    "src/token-type.ts": "packages/kiro-core/src/token-type.ts",
+    "src/tokenizer.ts": "packages/kiro-core/src/tokenizer.ts",
+    "src/transform.ts": "packages/kiro-core/src/transform.ts",
+    "src/truncation.ts": "packages/kiro-core/src/truncation.ts",
+    "src/usage.ts": "packages/kiro-core/src/usage.ts",
+    "src/login.ts": "packages/omp-provider-kiro/src/auth.ts",
+    "test/*.test.ts": "packages/kiro-core/test/*.test.ts",
+    "test/helpers/*": "packages/kiro-core/test/helpers/*",
+    "test/setup.ts": "packages/kiro-core/test/setup.ts",
+    "test/packaging.test.ts": "packages/omp-provider-kiro/test/packaging.test.ts",
+    "test/registration.test.ts": "packages/omp-provider-kiro/test/packaging.test.ts"
+  },
+  "notPorted": [
+    {
+      "path": "src/login-ui.ts",
+      "reason": "Upstream dùng PKCE browser login qua pi-tui. Bản port không tự chạy browser flow: nó đọc lại session kiro-cli / Kiro IDE, còn API key thì nhận trực tiếp. Chỉ port khi thay đổi chạm tới primitive trong oauth.ts."
+    },
+    {
+      "path": "test/stream.test.ts",
+      "reason": "Chưa có bản port. Thay đổi upstream trong src/stream.ts phải tự verify bằng tay hoặc viết test mới trong packages/kiro-core/test/."
+    },
+    {
+      "path": "test/login.test.ts",
+      "reason": "Bám vào PKCE flow của upstream, không áp dụng cho packages/omp-provider-kiro/src/auth.ts."
+    },
+    {
+      "path": "test/login-ui.test.ts",
+      "reason": "Bám vào pi-tui."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "reason": "Lịch sử release của upstream. Đọc để lấy ngữ cảnh, không copy vào repo này."
+    },
+    { "path": "RELEASE.md", "reason": "Quy trình release riêng của upstream." },
+    { "path": "AGENTS.md", "reason": "Hướng dẫn agent riêng của upstream." },
+    { "path": "CLAUDE.md", "reason": "Hướng dẫn agent riêng của upstream." },
+    { "path": "ralph.yml", "reason": "Harness riêng của upstream." },
+    { "path": "Dockerfile.lint", "reason": "Hạ tầng lint riêng của upstream." },
+    { "path": "fix-lint-all-branches.sh", "reason": "Script one-off của upstream." },
+    { "path": "docs/**", "reason": "Ngoài phạm vi." },
+    { "path": "scripts/**", "reason": "Script one-off của upstream." },
+    { "path": "package-lock.json", "reason": "Repo này dùng pnpm workspace." }
+  ],
+  "localOnly": [
+    "packages/kiro-core/src/types.ts",
+    "packages/kiro-core/src/blocks.ts",
+    "packages/kiro-core/src/cost.ts",
+    "packages/omp-provider-kiro/src/**",
+    "packages/dsh-llm-kiro/src/**"
+  ]
+}
