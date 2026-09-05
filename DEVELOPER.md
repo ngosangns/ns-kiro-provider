@@ -100,3 +100,53 @@ pnpm test
 ```
 
 Run the same sequence locally before pushing.
+
+## Releasing
+
+Publishing runs from `.github/workflows/publish.yml` using npm **trusted
+publishing**: npm verifies the workflow's OIDC identity instead of a token, so
+nothing is stored on a developer machine and no 2FA prompt blocks the release.
+Packages are published with provenance.
+
+### One-time setup (per package, on npmjs.com)
+
+For each of `ns-kiro-core`, `ns-omp-provider-kiro` and `ns-dsh-llm-kiro`:
+Settings → Trusted Publisher → GitHub Actions, with
+
+| Field | Value |
+| --- | --- |
+| Organization / user | `ngosangns` |
+| Repository | `ns-kiro-provider` |
+| Workflow filename | `publish.yml` |
+| Environment | *(leave empty)* |
+
+The workflow filename is part of what npm trusts, so renaming the workflow
+breaks publishing until the trusted publisher is updated to match.
+
+### Cutting a release
+
+1. Bump `version` in all three `packages/*/package.json` — keep them in step, the
+   adapters depend on an exact `ns-kiro-core` version.
+2. Merge that to `main`.
+3. Tag and push:
+
+   ```bash
+   git tag v0.2.0 && git push origin v0.2.0
+   ```
+
+The workflow re-runs lint, build, typecheck and tests, refuses to continue if
+the tag disagrees with any `package.json`, then packs and publishes
+`ns-kiro-core` first — the adapters pin an exact version of it, so the reverse
+order would leave them briefly uninstallable.
+
+`workflow_dispatch` runs the same job with a `dry-run` input for checking the
+packed output without publishing.
+
+### Why `pnpm pack` and `npm publish`, not one tool
+
+The adapters declare `"ns-kiro-core": "workspace:*"`. Only pnpm rewrites that to
+the real version when packing; `npm pack` would ship the literal `workspace:*`
+and the published package would be uninstallable. But `pnpm publish` has no
+`--provenance` and does not speak OIDC, so the tarball pnpm produces is handed
+to `npm publish`. The workflow asserts the dependency was rewritten before it
+publishes anything.

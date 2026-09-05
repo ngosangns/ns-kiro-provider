@@ -1,0 +1,103 @@
+name: Publish
+
+# Publishes all three packages to npm via trusted publishing (OIDC): no npm
+# token is stored anywhere, and no 2FA prompt blocks the run. npm verifies the
+# workflow identity instead, so the trusted publisher registered on npmjs.com
+# must name this repository AND this file (.github/workflows/publish.yml).
+#
+# Trigger by pushing a tag that matches the version in package.json:
+#   git tag v0.2.0 && git push origin v0.2.0
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Build and pack, but do not publish"
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for OIDC: this is what npm trusts in place of a token, and
+      # what signs the provenance attestation.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Node 22 ships npm 10, which predates trusted publishing.
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      # `check` typechecks against built declarations, so the build comes first.
+      - run: pnpm -r build
+      - run: pnpm -r check
+      - run: pnpm test
+
+      # A tag that disagrees with package.json would publish a version nobody
+      # asked for, under a tag pointing at different code. Refuse instead.
+      - name: Verify the tag matches every package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          mismatch=0
+          for pkg in kiro-core omp-provider-kiro dsh-llm-kiro; do
+            version=$(node -p "require('./packages/$pkg/package.json').version")
+            if [ "$version" != "$tag" ]; then
+              echo "::error::packages/$pkg is $version but the tag says $tag"
+              mismatch=1
+            fi
+          done
+          exit $mismatch
+
+      # `pnpm pack`, not `npm pack`: the adapters depend on ns-kiro-core through
+      # `workspace:*`, and only pnpm rewrites that to the real version. Packing
+      # with npm would publish the literal `workspace:*` and the package would
+      # be uninstallable.
+      - name: Pack
+        run: |
+          mkdir -p tarballs
+          for pkg in kiro-core omp-provider-kiro dsh-llm-kiro; do
+            (cd "packages/$pkg" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/tarballs")
+          done
+          ls -l tarballs
+
+      - name: Verify the packed dependency was resolved
+        run: |
+          for tarball in tarballs/ns-omp-provider-kiro-*.tgz tarballs/ns-dsh-llm-kiro-*.tgz; do
+            dependency=$(tar -xzOf "$tarball" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).dependencies['ns-kiro-core']")
+            echo "$tarball -> ns-kiro-core@$dependency"
+            case "$dependency" in
+              workspace:*|undefined)
+                echo "::error::$tarball still carries an unresolved workspace dependency"
+                exit 1
+                ;;
+            esac
+          done
+
+      # Order matters: the adapters pin an exact ns-kiro-core version, so
+      # publishing them first would leave them briefly uninstallable.
+      - name: Publish
+        if: ${{ inputs.dry-run != true }}
+        run: |
+          for name in ns-kiro-core ns-omp-provider-kiro ns-dsh-llm-kiro; do
+            echo "publishing $name"
+            npm publish tarballs/$name-*.tgz --provenance --access public
+          done
+
+      - name: Skipped (dry run)
+        if: ${{ inputs.dry-run == true }}
+        run: echo "Packed but not published; tarballs are listed above."
