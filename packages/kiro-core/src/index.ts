@@ -80,6 +80,28 @@ export {
   refreshKiroToken,
   resolveKiroCredentials,
 } from "./oauth.js";
+// The stages `streamKiro` runs in order. Exported so a caller can drive one on
+// its own — building a request without sending it, or assembling blocks from
+// events it sourced elsewhere — which is what splitting them apart was for.
+export {
+  type BuildKiroRequestParams,
+  type BuiltKiroRequest,
+  buildKiroRequest,
+  type KiroRequest,
+} from "./request-builder.js";
+export {
+  type KiroAttemptSummary,
+  type KiroCompletedResponse,
+  KiroResponseAssembler,
+} from "./response-assembler.js";
+export {
+  IDLE_TIMEOUT,
+  type KiroEventStreamOptions,
+  type KiroEventStreamOutcome,
+  type KiroEventStreamReader,
+  type KiroWireEventFrame,
+  readKiroEventStream,
+} from "./response-stream.js";
 // Kiro's own error vocabulary and the predicates this core classifies it with.
 // Published so consumers can interpret a reason code without an error instance
 // in hand (a persisted log line, say) instead of hardcoding copies of the
@@ -111,6 +133,12 @@ export {
   sanitizeSurrogates,
   toKiroToolUseId,
 } from "./transform.js";
+export {
+  abortableDelay,
+  createResponseHeaderDeadline,
+  logCapacityEvent,
+  type ResponseHeaderDeadline,
+} from "./transport.js";
 export { TRUNCATION_NOTICE, wasPreviousResponseTruncated } from "./truncation.js";
 export * from "./types.js";
 export { fetchKiroUsage, type KiroProviderUsage, type KiroProviderUsageBucket } from "./usage.js";
