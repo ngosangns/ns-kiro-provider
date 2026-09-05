@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { formatSafeError } from "./debug.js";
+import { debugLog, formatSafeError } from "./debug.js";
 import type { KiroAuthMethod, KiroCredentials } from "./oauth.js";
 
 const require = createRequire(import.meta.url);
@@ -288,6 +288,61 @@ export function saveKiroCliCredentials(creds: KiroCredentials): void {
       const sql = `UPDATE auth_kv SET value = '${escaped}' WHERE key = '${key}';`;
       if (execKiroCliDb(dbPath, sql)) return;
     } catch {}
+  }
+}
+
+/** Relative billing weight for one model, as kiro-cli reports it. */
+export interface KiroModelRate {
+  /** Multiplier applied to the billed amount; 1.0 is the baseline. */
+  multiplier: number;
+  /** Unit the multiplier applies to, e.g. `"Credit"`. */
+  unit?: string;
+}
+
+interface KiroCliListModelsResponse {
+  models?: Array<{ model_id?: unknown; rate_multiplier?: unknown; rate_unit?: unknown }>;
+}
+
+/**
+ * Read per-model billing weights from `kiro-cli chat --list-models`.
+ *
+ * The management catalog does not carry them, and Kiro publishes no per-token
+ * prices, so this is the only source for how much one model costs relative to
+ * another. Returns undefined when kiro-cli is absent or its output is not the
+ * shape expected — the catalog is still usable without rates, so this must
+ * never be fatal.
+ */
+export function getKiroCliModelRates(): Map<string, KiroModelRate> | undefined {
+  let raw: string;
+  try {
+    raw = execFileSync("kiro-cli", ["chat", "--list-models", "--format", "json"], {
+      encoding: "utf-8",
+      timeout: 10_000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch (error) {
+    debugLog("models.rates", { source: "kiro-cli", error: formatSafeError(error) });
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as KiroCliListModelsResponse;
+    if (!Array.isArray(parsed.models)) return undefined;
+    const rates = new Map<string, KiroModelRate>();
+    for (const model of parsed.models) {
+      const id = model?.model_id;
+      const multiplier = model?.rate_multiplier;
+      if (typeof id !== "string" || !id) continue;
+      if (typeof multiplier !== "number" || !Number.isFinite(multiplier) || multiplier <= 0) continue;
+      rates.set(id, {
+        multiplier,
+        ...(typeof model.rate_unit === "string" && model.rate_unit ? { unit: model.rate_unit } : {}),
+      });
+    }
+    return rates.size > 0 ? rates : undefined;
+  } catch (error) {
+    debugLog("models.rates", { source: "kiro-cli", error: formatSafeError(error) });
+    return undefined;
   }
 }
 

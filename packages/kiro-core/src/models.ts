@@ -5,6 +5,7 @@ import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "nod
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getKiroEffortConfig, type KiroEffortConfig } from "./effort.js";
+import { getKiroCliModelRates, type KiroModelRate } from "./kiro-cli.js";
 import { fetchKiroModelCatalog, type KiroCatalogModel } from "./management.js";
 import { KIRO_EFFORT_ORDER, type KiroEffort, type KiroModelSpec } from "./types.js";
 
@@ -335,7 +336,9 @@ function isCachedKiroModel(value: unknown): value is KiroModel {
     (value.effortMap === undefined || isEffortMap(value.effortMap)) &&
     (schema === undefined || isRecord(schema)) &&
     (tokenLimits === undefined || isRecord(tokenLimits)) &&
-    (value.firstTokenTimeout === undefined || isPositiveNumber(value.firstTokenTimeout))
+    (value.firstTokenTimeout === undefined || isPositiveNumber(value.firstTokenTimeout)) &&
+    (value.rateMultiplier === undefined || isPositiveNumber(value.rateMultiplier)) &&
+    (value.rateUnit === undefined || typeof value.rateUnit === "string")
   );
 }
 
@@ -469,8 +472,19 @@ function validateCatalogMetadata(model: KiroCatalogModel): {
   return { schema, tokenLimits };
 }
 
-/** Map an authenticated management catalog into models without discarding fresh metadata for bootstrap IDs. */
-export function mapKiroCatalogModels(catalogModels: KiroCatalogModel[], region: string): KiroModel[] {
+/**
+ * Map an authenticated management catalog into models without discarding fresh
+ * metadata for bootstrap IDs.
+ *
+ * `rates` is passed in rather than read here so this stays a pure projection:
+ * its only source shells out to kiro-cli, which a caller may not want on this
+ * path at all.
+ */
+export function mapKiroCatalogModels(
+  catalogModels: KiroCatalogModel[],
+  region: string,
+  rates?: Map<string, KiroModelRate>,
+): KiroModel[] {
   if (catalogModels.length === 0) {
     throw new Error(`Kiro management catalog returned no models in ${region}`);
   }
@@ -488,6 +502,7 @@ export function mapKiroCatalogModels(catalogModels: KiroCatalogModel[], region: 
     seenIds.add(id);
 
     const existing = kiroModels.find((model) => model.id === id);
+    const rate = rates?.get(kiroModelId);
     const { schema, tokenLimits } = validateCatalogMetadata(catalogModel);
     // Two-tier resolution, same as the request path: an authoritative schema
     // wins, and a known-model guess fills in only when the catalog carried no
@@ -514,6 +529,7 @@ export function mapKiroCatalogModels(catalogModels: KiroCatalogModel[], region: 
       input: existing ? [...existing.input] : hasVerifiedImageInput(kiroModelId) ? ["text", "image"] : ["text"],
       ...(id.startsWith("claude-") ? { recoverTextToolCalls: false } : {}),
       cost: ZERO_COST,
+      ...(rate ? { rateMultiplier: rate.multiplier, ...(rate.unit ? { rateUnit: rate.unit } : {}) } : {}),
       contextWindow: tokenLimits?.maxInputTokens ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: tokenLimits?.maxOutputTokens ?? DEFAULT_MAX_TOKENS,
       ...(existing?.firstTokenTimeout ? { firstTokenTimeout: existing.firstTokenTimeout } : {}),
@@ -557,7 +573,10 @@ export function isCacheStale(region: string): boolean {
 
 export async function updateKiroModelsCache(accessToken: string, region: string, profileArn?: string): Promise<void> {
   const response = await fetchKiroModelCatalog({ accessToken, region }, profileArn);
-  const models = mapKiroCatalogModels(response.models, region);
+  // Billing weights come from kiro-cli, the only source that publishes them.
+  // Absent when it is not installed, which leaves the catalog rate-less rather
+  // than failing the refresh.
+  const models = mapKiroCatalogModels(response.models, region, getKiroCliModelRates());
   const cache: ManagementModelsCache = readManagementCache() ?? {
     version: KIRO_MANAGEMENT_CACHE_VERSION,
     source: KIRO_MANAGEMENT_CACHE_SOURCE,

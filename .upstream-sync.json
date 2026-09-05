@@ -175,6 +175,14 @@
       "what": "Ghi lại kết quả kiểm chứng heuristic stopReason. KHÔNG đổi logic.",
       "why": "Heuristic `!receivedContextUsage && emittedToolCalls === 0 -> length` giống hệt upstream. Đã đo 2026-09-06 trên 5 kịch bản (text ngắn, text ~5000 ký tự, turn có tool call, claude-haiku-4.5 không schema, glm-5): contextUsage xuất hiện trong cả 5. Giả định của heuristic đứng vững, nên giữ nguyên logic và chỉ thay comment 'chưa kiểm chứng' bằng kết quả đo.",
       "risk": "Không có thay đổi hành vi. Nếu Kiro ngừng gửi contextUsage, response.done đã log receivedContextUsage để phát hiện."
+    },
+    {
+      "path": "packages/kiro-core/src/kiro-cli.ts, models.ts, types.ts; packages/omp-provider-kiro/src/models.ts",
+      "upstreamPath": "src/kiro-cli.ts, src/models.ts",
+      "since": "2026-09-06",
+      "what": "getKiroCliModelRates() đọc `kiro-cli chat --list-models --format json` lấy rate_multiplier/rate_unit; mapKiroCatalogModels nhận thêm param `rates` (vẫn pure) và gắn vào KiroModelSpec.rateMultiplier/rateUnit; updateKiroModelsCache truyền rates vào.",
+      "why": "Management catalog KHÔNG có thông tin chi phí, và Kiro không publish giá per-token — cost luôn là ZERO_COST. kiro-cli là nguồn duy nhất công bố trọng số tính tiền (0.05 qwen -> 2.4 gpt-5.6-sol). Hai nguồn bù nhau: management cho effort schema + maxOutputTokens, kiro-cli cho rate. Cố ý KHÔNG map rate vào `cost`: cost là USD/triệu token, rate là hệ số credit — nhét vào sẽ khiến host hiển thị '$2.2/1M tokens'.",
+      "risk": "Phụ thuộc output format của binary ngoài. Mọi lỗi (thiếu kiro-cli, JSON hỏng, entry không hợp lệ) đều degrade về 'không biết rate' chứ không phá refresh catalog. Bootstrap list cố ý không hardcode rate: pricing dễ đổi, absent tốt hơn sai. Test: packages/kiro-core/test/kiro-cli-rates.test.ts và models.test.ts ('attaches billing weights')."
     }
   ]
 }
