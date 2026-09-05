@@ -90,14 +90,18 @@ jobs:
 
       # Order matters: the adapters pin an exact ns-kiro-core version, so
       # publishing them first would leave them briefly uninstallable.
+      #
+      # The `./` on the path is load-bearing. A bare `tarballs/name-x.tgz` looks
+      # like `owner/repo` to npm, which resolves it as a git dependency and
+      # fails with EALLOWGIT instead of reading the file.
       - name: Publish
-        if: ${{ inputs.dry-run != true }}
         run: |
+          dry_run=""
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            dry_run="--dry-run"
+            echo "dry run: npm will validate the publish without uploading"
+          fi
           for name in ns-kiro-core ns-omp-provider-kiro ns-dsh-llm-kiro; do
             echo "publishing $name"
-            npm publish tarballs/$name-*.tgz --provenance --access public
+            npm publish ./tarballs/$name-*.tgz --provenance --access public $dry_run
           done
-
-      - name: Skipped (dry run)
-        if: ${{ inputs.dry-run == true }}
-        run: echo "Packed but not published; tarballs are listed above."
