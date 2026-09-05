@@ -12,6 +12,11 @@ adapters below — not meant to be installed on its own.
 - **Endpoints** — SSO region to management/runtime host resolution.
 - **Model catalog** — the bootstrap list, the authenticated regional catalog,
   and a validated on-disk cache at `~/.ns-kiro-provider-models-cache.json`.
+  Per-model billing weights (`rateMultiplier`) come from kiro-cli, the only
+  source that publishes them.
+- **Usage** — Kiro reports no token counts, only a billed amount, surfaced as
+  `usage.credits`. `usage.input` is derived from the context-usage frame and
+  `usage.output` from a tiktoken estimate.
 - **Credentials** — reads the kiro-cli SQLite store and the Kiro IDE token file,
   refreshes IDC / desktop / external-IdP / API-key sessions, and writes
   refreshes back so kiro-cli stays on the same token.
@@ -46,6 +51,19 @@ and nothing else. Block indexes are monotonic across the whole response,
 including across an internal retry, so a host that cannot un-deliver a block
 still receives a coherent sequence; `canDiscardEmittedBlocks` tells the core
 which kind of host it is talking to.
+
+## The stages underneath
+
+`streamKiro` is orchestration over four pieces, each exported for use on its
+own — building a request without sending it, or assembling blocks from events
+sourced elsewhere:
+
+| Export | Does |
+| --- | --- |
+| `buildKiroRequest` | Neutral messages to a wire request: history shaping, tool specs, pre-send repair. Pure, no I/O |
+| `readKiroEventStream` | AWS event-stream framing and the stall timeouts; yields parsed wire events |
+| `KiroResponseAssembler` | Content blocks, thinking, tool calls, text-dialect recovery, usage, stop reason |
+| `abortableDelay`, `createResponseHeaderDeadline`, `logCapacityEvent` | Transport timing |
 
 ## Credit
 
