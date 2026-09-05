@@ -17,7 +17,7 @@ import {
   type KiroAdditionalModelRequestFields,
 } from "./effort.js";
 import { getKiroEndpoints } from "./endpoints.js";
-import { parseKiroEvent } from "./event-parser.js";
+import { type KiroWireUsage, parseKiroEvent } from "./event-parser.js";
 import {
   addPlaceholderTools,
   assertHistoryWithinLimit,
@@ -658,7 +658,7 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
     const bodyReader = (response.body as ReadableStream<Uint8Array>).getReader();
     let totalContent = "";
     let lastContentData = "";
-    let usageEvent: { inputTokens?: number; outputTokens?: number } | null = null;
+    let usageEvent: KiroWireUsage | null = null;
     let receivedContextUsage = false;
     const thinkingParser = thinkingEnabled ? new ThinkingTagParser(blocks) : null;
     let nativeThinkingBlockIndex: number | null = null;
@@ -842,6 +842,10 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
         }
         case "usage": {
           usageEvent = event.data;
+          // The parsed event keeps only the fields this package understands.
+          // Log the frame verbatim so a field Kiro adds — cache counters above
+          // all — is visible without having to guess its name first.
+          if (debugEnabled()) debugLog("response.usageRaw", eventPayload);
           break;
         }
         case "error": {
@@ -972,6 +976,10 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
     if (usageEvent?.inputTokens !== undefined) usage.input = usageEvent.inputTokens;
     usage.output = usageEvent?.outputTokens ?? countTokens(totalContent);
     usage.totalTokens = usage.input + usage.output;
+    // Only set when reported: leaving these absent is what tells a host that
+    // Kiro said nothing about caching, rather than that nothing was cached.
+    if (usageEvent?.cacheReadTokens !== undefined) usage.cacheRead = usageEvent.cacheReadTokens;
+    if (usageEvent?.cacheWriteTokens !== undefined) usage.cacheWrite = usageEvent.cacheWriteTokens;
     usage.cost = calculateKiroCost(model.cost, usage);
 
     // Use `emittedToolCalls`, not the count seen on the wire: a turn whose calls

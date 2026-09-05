@@ -101,6 +101,13 @@ export interface KiroUsage {
   totalTokens: number;
   /** Percentage of the context window Kiro reported for this turn. */
   contextPercent?: number;
+  /**
+   * Cached input tokens, present only when Kiro reports them. Absent means the
+   * service said nothing about caching for this turn — not that nothing was
+   * cached — so hosts should render it as unknown rather than zero.
+   */
+  cacheRead?: number;
+  cacheWrite?: number;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
 }
 

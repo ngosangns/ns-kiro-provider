@@ -512,6 +512,32 @@ describe("streamKiro — stop reason and usage", () => {
     expect(usage.totalTokens).toBe(127);
   });
 
+  it("surfaces cache counts the usage frame reports", async () => {
+    stubFetch(
+      makeOkResponse(
+        '{"content":"Hi"}{"usage":{"inputTokens":1000,"outputTokens":7,"cacheReadInputTokens":900,"cacheWriteInputTokens":120}}{"contextUsagePercentage":10}',
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { cacheRead?: number; cacheWrite?: number } })
+      .usage;
+    expect(usage.cacheRead).toBe(900);
+    expect(usage.cacheWrite).toBe(120);
+  });
+
+  it("leaves cache counts absent when the usage frame reports none", async () => {
+    stubFetch(
+      makeOkResponse('{"content":"Hi"}{"usage":{"inputTokens":120,"outputTokens":7}}{"contextUsagePercentage":10}'),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { cacheRead?: number; cacheWrite?: number } })
+      .usage;
+    expect(usage.cacheRead).toBeUndefined();
+    expect(usage.cacheWrite).toBeUndefined();
+  });
+
   it("estimates output tokens when the wire reports none, so tool-only turns are not zero", async () => {
     stubFetch(
       makeOkResponse(

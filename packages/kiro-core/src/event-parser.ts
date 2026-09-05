@@ -12,8 +12,48 @@ export type KiroWireEvent =
   | { type: "toolUseStop"; data: { stop: boolean } }
   | { type: "contextUsage"; data: { contextUsagePercentage: number } }
   | { type: "followupPrompt"; data: string }
-  | { type: "usage"; data: { inputTokens?: number; outputTokens?: number } }
+  | { type: "usage"; data: KiroWireUsage }
   | { type: "error"; data: { error: string; message?: string } };
+
+/**
+ * Token counts from a `usage` frame. Every field is optional because Kiro does
+ * not emit the frame on every turn, and emits only a subset when it does.
+ *
+ * Whether Kiro reports cache counts at all is unconfirmed, and its request
+ * schema exposes no way to ask for caching — so the cache fields are read from
+ * the spellings its upstreams use (Bedrock's `cacheReadInputTokens`,
+ * Anthropic's `cache_read_input_tokens`) rather than one assumed name. An
+ * absent count stays `undefined` rather than becoming `0`, so a consumer can
+ * tell "nothing was cached" apart from "the service said nothing about cache".
+ * Set `KIRO_DEBUG=1` to log the frame verbatim and settle the question.
+ */
+export interface KiroWireUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
+/** Accept only a finite, non-negative count; anything else is treated as absent. */
+function tokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function firstTokenCount(source: Record<string, unknown>, keys: readonly string[]): number | undefined {
+  for (const key of keys) {
+    const count = tokenCount(source[key]);
+    if (count !== undefined) return count;
+  }
+  return undefined;
+}
+
+const CACHE_READ_KEYS = ["cacheReadInputTokens", "cache_read_input_tokens", "cacheReadTokens"] as const;
+const CACHE_WRITE_KEYS = [
+  "cacheWriteInputTokens",
+  "cache_creation_input_tokens",
+  "cacheCreationInputTokens",
+  "cacheWriteTokens",
+] as const;
 
 export function parseKiroEvent(parsed: Record<string, unknown>): KiroWireEvent | null {
   if (parsed.content !== undefined) return { type: "content", data: parsed.content as string };
@@ -56,9 +96,16 @@ export function parseKiroEvent(parsed: Record<string, unknown>): KiroWireEvent |
   }
   if (parsed.usage !== undefined) {
     const u = parsed.usage as Record<string, unknown>;
+    const cacheReadTokens = firstTokenCount(u, CACHE_READ_KEYS);
+    const cacheWriteTokens = firstTokenCount(u, CACHE_WRITE_KEYS);
     return {
       type: "usage",
-      data: { inputTokens: u.inputTokens as number | undefined, outputTokens: u.outputTokens as number | undefined },
+      data: {
+        inputTokens: tokenCount(u.inputTokens),
+        outputTokens: tokenCount(u.outputTokens),
+        ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+        ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+      },
     };
   }
   return null;

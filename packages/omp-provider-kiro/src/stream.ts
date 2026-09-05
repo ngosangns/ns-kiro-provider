@@ -224,7 +224,12 @@ export function streamKiroForOmp(
             output.usage.input = event.usage.input;
             output.usage.output = event.usage.output;
             output.usage.totalTokens = event.usage.totalTokens;
-            output.usage.cost = { ...event.usage.cost, cacheRead: 0, cacheWrite: 0 };
+            // OMP's usage fields are required numbers, so an unreported cache
+            // count collapses to 0 here — the distinction the core preserves
+            // cannot be expressed on this side.
+            output.usage.cacheRead = event.usage.cacheRead ?? 0;
+            output.usage.cacheWrite = event.usage.cacheWrite ?? 0;
+            output.usage.cost = { ...event.usage.cost };
             if (event.usage.contextPercent !== undefined) {
               (output.usage as unknown as Record<string, unknown>).contextPercent = event.usage.contextPercent;
             }
