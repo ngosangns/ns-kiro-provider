@@ -21,6 +21,25 @@ the shared-plumbing rationale. A new host adapter belongs alongside
 protocol changes (streaming, retries, credentials, model catalog) belong in
 `ns-kiro-core`.
 
+### One model call, end to end
+
+A single request is split across four modules so each can be read — and
+tested — on its own. `stream.ts` is the orchestrator and holds only what needs
+the whole picture: credential rotation, the HTTP retry policy, and the decision
+to ask again.
+
+| Module | Owns |
+| --- | --- |
+| [`request-builder.ts`](packages/kiro-core/src/request-builder.ts) | Neutral messages to a `KiroRequest`: history shaping, tool specs, pre-send repair. Pure — no I/O, so request shaping is testable without a transport |
+| [`transport.ts`](packages/kiro-core/src/transport.ts) | Abortable delays, the response-header deadline, capacity logging |
+| [`response-stream.ts`](packages/kiro-core/src/response-stream.ts) | AWS event-stream framing and the stall timeouts; yields parsed wire events |
+| [`response-assembler.ts`](packages/kiro-core/src/response-assembler.ts) | What the response *says*: content blocks, thinking, tool calls, text-dialect recovery, usage, stop reason |
+| [`stream.ts`](packages/kiro-core/src/stream.ts) | Orchestration: endpoint and profile resolution, HTTP retries (403 / capacity / rate limit), degenerate-response retries |
+
+When porting an upstream change to `src/stream.ts`, map it to the module that
+owns that concern rather than looking for the matching lines — see the
+divergence entry in `.upstream-sync.json` for the region map.
+
 ## Prerequisites
 
 - Node >=22 (`engines.node` in `package.json`)

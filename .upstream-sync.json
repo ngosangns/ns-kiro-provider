@@ -108,6 +108,22 @@
       "what": "Bootstrap catalog thêm claude-opus-5, claude-opus-4.5, gpt-5.6-luna/sol/terra (15 -> 20 model).",
       "why": "Đối chiếu với catalog thật: 5 model này Kiro đang phục vụ nhưng bootstrap không có. Ngoài việc chọn được model trước khi auth, entry bootstrap còn cấp `name` đẹp cho mapKiroCatalogModels — Kiro không trả displayName nên humanizeModelId sinh ra 'Gpt 5 6 Sol', 'Claude Opus 4 5'.",
       "risk": "Không xóa claude-fable-5 dù không thấy trong catalog của tài khoản này: bằng chứng chỉ từ một account/một region, không đủ để kết luận model đã bị gỡ."
+    },
+    {
+      "path": "packages/kiro-core/src/stream.ts + request-builder.ts, response-stream.ts, response-assembler.ts, transport.ts",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-06",
+      "what": "CẤU TRÚC LẠI TOÀN BỘ. streamKiro tách từ 809 dòng trong một generator thành 4 module: request-builder.ts (dựng KiroRequest, thuần tuý), response-stream.ts (đọc AWS event stream + timeout first-token/idle), response-assembler.ts (class KiroResponseAssembler: dựng block, recovery tool call dạng text, echo strip, usage, stopReason), transport.ts (abortableDelay, createResponseHeaderDeadline, logCapacityEvent). stream.ts còn 402 dòng, chỉ giữ setup + vòng retry HTTP + orchestration.",
+      "why": "User yêu cầu refactor sau khi đã được trình bày chi phí sync. Hành vi giữ nguyên: 449 test pass, không đổi bất kỳ contract public nào ngoài việc thêm export type mới.",
+      "risk": "ĐÂY LÀ DIVERGENCE ĐẮT NHẤT TRONG REPO. src/stream.ts là file upstream sửa nhiều nhất — 62 commit trong 12 tháng, gấp 2.3x file thứ nhì. Mỗi commit upstream chạm src/stream.ts từ nay phải được map thủ công sang đúng module trong 4 file trên; không còn đối chiếu 1:1 theo dòng được nữa. Bảng map vùng: dựng request -> request-builder.ts; framing/timeout -> response-stream.ts; block/thinking/tool-call/usage/stopReason -> response-assembler.ts; delay/deadline/capacity log -> transport.ts; còn lại (auth 403, capacity, rate limit, profile) -> stream.ts. Cân nhắc nghiêm túc việc bỏ sync tự động và chuyển sang chỉ port có chọn lọc theo bug/feature cụ thể."
+    },
+    {
+      "path": "packages/kiro-core/test/stream.test.ts",
+      "upstreamPath": "test/stream.test.ts",
+      "since": "2026-09-06",
+      "what": "Thêm makeRealBodyResponse dùng ReadableStream thật, và test 'reads a real ReadableStream body, taking its reader exactly once'.",
+      "why": "makeOkResponse trả reader MỚI mỗi lần gọi getReader(), trong khi body thật throw 'ReadableStream is locked' ở lần thứ hai. Nghĩa là mọi lỗi lấy reader hai lần đều pass test nhưng hỏng với service thật — đúng lỗi đã suýt lọt trong lúc tách response-stream.ts. Đã kiểm chứng: tái tạo lỗi thì test fail, khôi phục thì pass.",
+      "risk": "Không có; test này chỉ chặt hơn bản cũ."
     }
   ]
 }

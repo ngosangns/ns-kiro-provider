@@ -74,6 +74,25 @@ function makeOkResponse(body: string): Response {
   } as unknown as Response;
 }
 
+/**
+ * A response backed by a genuine ReadableStream.
+ *
+ * `makeOkResponse` hands out a fresh reader on every `getReader()` call, which a
+ * real body does not: the second call throws "ReadableStream is locked". Any
+ * code path that takes the reader twice therefore passes against the double and
+ * fails against the service, so at least one test has to use the real thing.
+ */
+function makeRealBodyResponse(body: string): Response {
+  const frames = encodeBody(body);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(frames);
+      controller.close();
+    },
+  });
+  return { ok: true, body: stream } as unknown as Response;
+}
+
 /** One response delivered as several reader chunks, so mid-event splits are exercised. */
 function makeChunkedResponse(chunks: string[]): Response {
   const read = vi.fn();
@@ -510,6 +529,14 @@ describe("streamKiro — stop reason and usage", () => {
     expect(usage.input).toBe(120);
     expect(usage.output).toBe(7);
     expect(usage.totalTokens).toBe(127);
+  });
+
+  it("reads a real ReadableStream body, taking its reader exactly once", async () => {
+    stubFetch(makeRealBodyResponse('{"content":"Hi"}{"usage":{"inputTokens":9,"outputTokens":2}}'));
+    const events = await collect(streamKiro(makeRequest()));
+
+    expect(events.find((e) => e.type === "text_end")).toMatchObject({ text: "Hi" });
+    expect(events.find((e) => e.type === "done")).toBeDefined();
   });
 
   it("surfaces cache counts the usage frame reports", async () => {
