@@ -104,10 +104,21 @@ export interface KiroUsage {
   /**
    * Cached input tokens, present only when Kiro reports them. Absent means the
    * service said nothing about caching for this turn — not that nothing was
-   * cached — so hosts should render it as unknown rather than zero.
+   * cached — so hosts should render it as unknown rather than zero. Kiro caches
+   * prompts server-side but has not been observed to report these counts; see
+   * {@link credits}, which it does report.
    */
   cacheRead?: number;
   cacheWrite?: number;
+  /**
+   * Amount Kiro billed for this turn, in {@link creditUnit}. This is the only
+   * usage figure Kiro actually sends, and it already reflects any server-side
+   * prompt cache hit — a repeated prefix bills roughly half of a fresh one.
+   * Unrelated to {@link KiroUsage.cost}, which is derived from the model's own
+   * per-token rates and stays zero while Kiro publishes none.
+   */
+  credits?: number;
+  creditUnit?: string;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
 }
 

@@ -82,6 +82,18 @@ describe("Feature 8: Stream Event Parsing", () => {
       expect(e?.type === "usage" && e.data.outputTokens).toBe(50);
     });
 
+    // What Kiro actually sends: `usage` is the billed amount, not an object.
+    it("parses the credit billing frame Kiro really emits", () => {
+      const e = parseKiroEvent({ unit: "credit", unitPlural: "credits", usage: 0.06586360271973467 });
+      expect(e?.type === "usage" && e.data.credits).toBe(0.06586360271973467);
+      expect(e?.type === "usage" && e.data.creditUnit).toBe("credit");
+      expect(e?.type === "usage" && e.data.inputTokens).toBeUndefined();
+    });
+
+    it("ignores a negative billed amount", () => {
+      expect(parseKiroEvent({ unit: "credit", usage: -1 })).toBeNull();
+    });
+
     it("omits cache counts when the usage frame carries none", () => {
       const e = parseKiroEvent({ usage: { inputTokens: 100, outputTokens: 50 } });
       expect(e?.type === "usage" && e.data).toEqual({ inputTokens: 100, outputTokens: 50 });

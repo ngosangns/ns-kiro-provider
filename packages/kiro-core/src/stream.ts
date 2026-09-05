@@ -140,11 +140,29 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
   });
 
   let systemPrompt = request.systemPrompt ?? "";
-  // Kiro's runtime endpoint honors structured effort but only exposes Claude's
-  // user-visible thinking stream when the legacy thinking markers are also
-  // present. Keep both controls: structured fields select effort, while these
-  // markers preserve the <thinking> content consumed by ThinkingTagParser.
-  if (thinkingEnabled && effortConfig?.field !== "reasoning") {
+  // Legacy fallback for turning the thinking stream on, kept only where nothing
+  // better exists. When the request already carries the catalog's own `thinking`
+  // field, the markers are pure duplication: they restate in prose what the
+  // structured field states, and prepend an effort-dependent budget to the front
+  // of the system prompt for no gain.
+  //
+  // Verified 2026-09-06 against claude-sonnet-5 at effort `high`: dropping the
+  // markers left the thinking stream intact — one block, comparable length —
+  // in both arrangements.
+  //
+  // This does NOT buy back Kiro's server-side prompt cache. Measured the same
+  // day: a repeated prefix bills ~0.035 credits against ~0.066 for a fresh one,
+  // but changing effort misses even when the system prompt is byte-identical,
+  // and each effort then warms its own entry. The effort travels in
+  // `additionalModelRequestFields`, so it is part of the cache key no matter
+  // what the prompt says.
+  //
+  // Still emitted when Kiro offers no structured control: a model whose catalog
+  // entry carries no effort schema, or a Claude turn with no effort selected,
+  // has nothing else to switch thinking on with. Models keyed off `reasoning`
+  // (the GPT family) never wanted the markers at all.
+  const sendsThinkingField = !!additionalModelRequestFields && "thinking" in additionalModelRequestFields;
+  if (thinkingEnabled && effortConfig?.field !== "reasoning" && !sendsThinkingField) {
     const budget =
       effort === "xhigh" || effort === "max" ? 50000 : effort === "high" ? 30000 : effort === "medium" ? 20000 : 10000;
     systemPrompt = `<thinking_mode>enabled</thinking_mode><max_thinking_length>${budget}</max_thinking_length>${systemPrompt ? `\n${systemPrompt}` : ""}`;

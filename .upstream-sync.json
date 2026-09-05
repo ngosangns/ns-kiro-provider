@@ -124,6 +124,22 @@
       "what": "Thêm makeRealBodyResponse dùng ReadableStream thật, và test 'reads a real ReadableStream body, taking its reader exactly once'.",
       "why": "makeOkResponse trả reader MỚI mỗi lần gọi getReader(), trong khi body thật throw 'ReadableStream is locked' ở lần thứ hai. Nghĩa là mọi lỗi lấy reader hai lần đều pass test nhưng hỏng với service thật — đúng lỗi đã suýt lọt trong lúc tách response-stream.ts. Đã kiểm chứng: tái tạo lỗi thì test fail, khôi phục thì pass.",
       "risk": "Không có; test này chỉ chặt hơn bản cũ."
+    },
+    {
+      "path": "packages/kiro-core/src/event-parser.ts, packages/kiro-core/src/types.ts, packages/kiro-core/src/response-assembler.ts",
+      "upstreamPath": "src/event-parser.ts",
+      "since": "2026-09-06",
+      "what": "Frame `usage` nhận thêm dạng billing: {unit:'credit', unitPlural:'credits', usage:<number>} -> KiroUsage.credits/creditUnit. Dạng object (inputTokens/outputTokens) vẫn giữ.",
+      "why": "Đo thật 2026-09-06 (claude-sonnet-5, us-east-1): Kiro KHÔNG gửi token count. Frame usage là bản ghi credit, và `usage` là NUMBER chứ không phải object — nên `u.inputTokens` luôn undefined. Đường token của provider chưa bao giờ chạy với Kiro thật: usage.input luôn đến từ contextUsagePercentage × contextWindow, usage.output luôn từ ước lượng tiktoken. Credit là con số chi phí thật và trước đây bị vứt hoàn toàn.",
+      "risk": "Nếu Kiro bổ sung token count dạng object, nhánh cũ vẫn xử lý. Test: packages/kiro-core/test/event-parser.test.ts, 'parses the credit billing frame Kiro really emits'."
+    },
+    {
+      "path": "packages/kiro-core/src/stream.ts",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-06",
+      "what": "Bỏ marker <thinking_mode>/<max_thinking_length> khi request đã gửi field `thinking` của catalog (Claude có schema + có effort). Vẫn giữ marker cho model không có effort schema, cho Claude không chọn effort, và không đụng tới GPT (field `reasoning`).",
+      "why": "Trùng lặp: marker nói lại bằng prose đúng thứ field `thinking` đã nói, và nhét budget phụ thuộc effort vào đầu system prompt. Đo thật 2026-09-06 (claude-sonnet-5, effort high): bỏ marker vẫn giữ nguyên thinking stream (1 block, độ dài tương đương).",
+      "risk": "KHÔNG phải tối ưu cache — giả thuyết ban đầu đã bị chính phép đo bác bỏ. Kiro có cache prefix server-side (lặp prefix ~0.035 credit so với ~0.066 khi mới), nhưng đổi effort vẫn miss dù system prompt giống hệt từng byte, và mỗi effort warm entry riêng: effort nằm trong additionalModelRequestFields nên là một phần cache key bất kể prompt. Đừng port thay đổi này với lý do tiết kiệm cache. Test: packages/kiro-core/test/stream.test.ts, describe 'legacy thinking markers'."
     }
   ]
 }

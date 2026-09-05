@@ -218,6 +218,8 @@ export class KiroResponseAssembler {
     // Kiro said nothing about caching, rather than that nothing was cached.
     if (this.usageEvent?.cacheReadTokens !== undefined) this.usage.cacheRead = this.usageEvent.cacheReadTokens;
     if (this.usageEvent?.cacheWriteTokens !== undefined) this.usage.cacheWrite = this.usageEvent.cacheWriteTokens;
+    if (this.usageEvent?.credits !== undefined) this.usage.credits = this.usageEvent.credits;
+    if (this.usageEvent?.creditUnit !== undefined) this.usage.creditUnit = this.usageEvent.creditUnit;
     this.usage.cost = calculateKiroCost(this.model.cost, this.usage);
 
     // Use `emittedToolCalls`, not the count seen on the wire: a turn whose calls
