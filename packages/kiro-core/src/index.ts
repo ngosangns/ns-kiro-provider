@@ -21,7 +21,7 @@ export {
   type KiroEndpoints,
   resolveApiRegion,
 } from "./endpoints.js";
-export { type KiroWireEvent, parseKiroEvent } from "./event-parser.js";
+export { type KiroWireEvent, type KiroWireUsage, parseKiroEvent } from "./event-parser.js";
 export {
   isKiroToolStructureRule,
   KIRO_TOOL_STRUCTURE_RULES,

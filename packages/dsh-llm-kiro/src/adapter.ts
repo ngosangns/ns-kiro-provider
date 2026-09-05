@@ -193,7 +193,14 @@ export class KiroAdapter extends LlmAdapter {
         case "usage":
           yield {
             type: "usage",
-            usage: { inputTokens: event.usage.input, outputTokens: event.usage.output },
+            usage: {
+              inputTokens: event.usage.input,
+              outputTokens: event.usage.output,
+              // Optional on both sides, so an unreported count stays absent
+              // instead of being reported as a cache miss.
+              ...(event.usage.cacheRead !== undefined ? { cacheReadTokens: event.usage.cacheRead } : {}),
+              ...(event.usage.cacheWrite !== undefined ? { cacheWriteTokens: event.usage.cacheWrite } : {}),
+            },
           };
           break;
         case "done":

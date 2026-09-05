@@ -37,6 +37,37 @@ kiro-cli login
 Builder ID, IAM Identity Center, Google, GitHub, and enterprise OIDC all work,
 because kiro-cli does them. A Kiro API key (`ksk_…`) is accepted directly.
 
+## What Kiro reports, and what it does not
+
+Measured 2026-09-06 against `claude-sonnet-5` in `us-east-1`. Recorded here so
+the questions are not re-opened from first principles.
+
+**Token counts: none.** Kiro's `usage` frame is a billing record —
+`{unit: "credit", usage: 0.0659}` — not token counts. `usage.input` is therefore
+derived from the `contextUsagePercentage` frame, and `usage.output` from a
+tiktoken estimate over what the model emitted. `usage.credits` carries the
+figure Kiro actually bills.
+
+**Prompt caching: real, but not controllable.** Kiro caches prompts server-side
+on its own: a repeated prefix billed ~0.035 credits against ~0.066 for a fresh
+one, and a changed prefix went straight back to the full price. There is no way
+to ask for it — every model's `additionalModelRequestFieldsSchema` sets
+`"additionalProperties": false` and allows only `thinking`/`output_config`/
+`max_tokens` (Claude) or `reasoning` (GPT), so a `cachePoint` or `cache_control`
+field is rejected rather than honoured. Kiro also reports no cache token counts.
+
+Reasoning effort is part of the cache key: changing it misses even when the
+prompt is byte-identical, and each effort level then warms its own entry.
+
+**Stop reasons: inferred.** Kiro sends none, so a turn with no tool call that
+never carried a `contextUsagePercentage` frame is reported as `length`. The
+frame arrived in every case checked — a short reply, a ~5000-character one, a
+tool-call turn, a model with no effort schema, and a non-Claude model — so its
+absence does mark an abnormal turn rather than a normal short answer.
+
+Set `KIRO_DEBUG=1` to log the frames verbatim (`~/.ns-kiro-provider/logs/`) if
+any of this needs re-checking against a newer Kiro.
+
 ## Install
 
 All three packages are published on npm (`ns-kiro-core`, `ns-omp-provider-kiro`,

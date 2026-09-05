@@ -59,15 +59,42 @@
       "path": "CHANGELOG.md",
       "reason": "Lịch sử release của upstream. Đọc để lấy ngữ cảnh, không copy vào repo này."
     },
-    { "path": "RELEASE.md", "reason": "Quy trình release riêng của upstream." },
-    { "path": "AGENTS.md", "reason": "Hướng dẫn agent riêng của upstream." },
-    { "path": "CLAUDE.md", "reason": "Hướng dẫn agent riêng của upstream." },
-    { "path": "ralph.yml", "reason": "Harness riêng của upstream." },
-    { "path": "Dockerfile.lint", "reason": "Hạ tầng lint riêng của upstream." },
-    { "path": "fix-lint-all-branches.sh", "reason": "Script one-off của upstream." },
-    { "path": "docs/**", "reason": "Ngoài phạm vi." },
-    { "path": "scripts/**", "reason": "Script one-off của upstream." },
-    { "path": "package-lock.json", "reason": "Repo này dùng pnpm workspace." }
+    {
+      "path": "RELEASE.md",
+      "reason": "Quy trình release riêng của upstream."
+    },
+    {
+      "path": "AGENTS.md",
+      "reason": "Hướng dẫn agent riêng của upstream."
+    },
+    {
+      "path": "CLAUDE.md",
+      "reason": "Hướng dẫn agent riêng của upstream."
+    },
+    {
+      "path": "ralph.yml",
+      "reason": "Harness riêng của upstream."
+    },
+    {
+      "path": "Dockerfile.lint",
+      "reason": "Hạ tầng lint riêng của upstream."
+    },
+    {
+      "path": "fix-lint-all-branches.sh",
+      "reason": "Script one-off của upstream."
+    },
+    {
+      "path": "docs/**",
+      "reason": "Ngoài phạm vi."
+    },
+    {
+      "path": "scripts/**",
+      "reason": "Script one-off của upstream."
+    },
+    {
+      "path": "package-lock.json",
+      "reason": "Repo này dùng pnpm workspace."
+    }
   ],
   "localOnly": [
     "packages/kiro-core/src/types.ts",
@@ -84,6 +111,70 @@
       "what": "Pass khôi phục tool call dạng text bị chặn khi model khai recoverTextToolCalls === false.",
       "why": "Cả upstream lẫn bản port đều set field này (false cho mọi model Claude) nhưng không đọc nó ở stream.ts. Hậu quả: prose chỉ *trích dẫn* cú pháp — model giải thích cách gọi tool — bị nâng thành tool call thật mà model chưa từng phát ra. Đúng thứ comment trong models.ts nói cần tránh.",
       "risk": "Nếu upstream tự sửa bug này theo cách khác, đừng port đè — đối chiếu trước. Test giữ hành vi: packages/kiro-core/test/stream.test.ts, hai case 'does not lift ... a native-tool-call model'."
+    },
+    {
+      "path": "packages/kiro-core/src/event-parser.ts, packages/kiro-core/src/stream.ts",
+      "upstreamPath": "src/event-parser.ts, src/stream.ts",
+      "since": "2026-09-06",
+      "what": "Frame `usage` đọc thêm cache token (nhiều spelling: cacheReadInputTokens / cache_read_input_tokens / ...), validate mọi token count phải là số hữu hạn không âm, và log frame nguyên văn qua debugLog('response.usageRaw') khi KIRO_DEBUG=1. KiroUsage có thêm cacheRead?/cacheWrite? optional.",
+      "why": "Schema `additionalModelRequestFieldsSchema` của Kiro đặt `additionalProperties: false` và chỉ cho phép thinking/output_config/max_tokens (Claude) hoặc reasoning (GPT) — không có đường nào gửi cache directive từ client. Đòn bẩy duy nhất còn lại là quan sát: trước thay đổi này provider vứt mọi tín hiệu cache và hardcode cacheRead/cacheWrite = 0, nên không ai biết Kiro có cache hay không. Optional (không phải 0) để phân biệt 'không cache' với 'service không nói gì'.",
+      "risk": "Nếu upstream thêm xử lý cache theo cách khác, đối chiếu trước khi port đè. Test giữ hành vi: packages/kiro-core/test/event-parser.test.ts (nhóm cache count) và packages/kiro-core/test/stream.test.ts ('surfaces cache counts', 'leaves cache counts absent')."
+    },
+    {
+      "path": "packages/kiro-core/src/effort.ts",
+      "upstreamPath": "src/effort.ts",
+      "since": "2026-09-06",
+      "what": "fallbackKiroEffort match GPT bằng regex /(^|-)gpt-/ thay cho startsWith('openai-gpt'); GPT_EFFORT_VALUES thêm 'max'; CLAUDE_EXTENDED_EFFORT_MODELS thêm 'claude-opus-5'.",
+      "why": "Catalog thật của Kiro (us-east-1, 2026-09-05) phục vụ GPT dưới tên trần `gpt-5.6-sol|terra|luna`, không còn `openai-gpt-5.6`. Prefix cũ không bao giờ khớp nên fallback ladder chết hoàn toàn với mọi model GPT hiện hành. Enum `reasoning.effort` thật là none/low/medium/high/xhigh/max — bản cũ thiếu 'max'.",
+      "risk": "Regex vẫn khớp tên cũ `openai-gpt-5.6` nên không phá tương thích. Test giữ hành vi: packages/kiro-core/test/models.test.ts, nhóm 'derives the GPT reasoning ladder' và 'does not mistake a non-GPT model'."
+    },
+    {
+      "path": "packages/kiro-core/src/models.ts",
+      "upstreamPath": "src/models.ts",
+      "since": "2026-09-06",
+      "what": "Bootstrap catalog thêm claude-opus-5, claude-opus-4.5, gpt-5.6-luna/sol/terra (15 -> 20 model).",
+      "why": "Đối chiếu với catalog thật: 5 model này Kiro đang phục vụ nhưng bootstrap không có. Ngoài việc chọn được model trước khi auth, entry bootstrap còn cấp `name` đẹp cho mapKiroCatalogModels — Kiro không trả displayName nên humanizeModelId sinh ra 'Gpt 5 6 Sol', 'Claude Opus 4 5'.",
+      "risk": "Không xóa claude-fable-5 dù không thấy trong catalog của tài khoản này: bằng chứng chỉ từ một account/một region, không đủ để kết luận model đã bị gỡ."
+    },
+    {
+      "path": "packages/kiro-core/src/stream.ts + request-builder.ts, response-stream.ts, response-assembler.ts, transport.ts",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-06",
+      "what": "CẤU TRÚC LẠI TOÀN BỘ. streamKiro tách từ 809 dòng trong một generator thành 4 module: request-builder.ts (dựng KiroRequest, thuần tuý), response-stream.ts (đọc AWS event stream + timeout first-token/idle), response-assembler.ts (class KiroResponseAssembler: dựng block, recovery tool call dạng text, echo strip, usage, stopReason), transport.ts (abortableDelay, createResponseHeaderDeadline, logCapacityEvent). stream.ts còn 402 dòng, chỉ giữ setup + vòng retry HTTP + orchestration.",
+      "why": "User yêu cầu refactor sau khi đã được trình bày chi phí sync. Hành vi giữ nguyên: 449 test pass, không đổi bất kỳ contract public nào ngoài việc thêm export type mới.",
+      "risk": "ĐÂY LÀ DIVERGENCE ĐẮT NHẤT TRONG REPO. src/stream.ts là file upstream sửa nhiều nhất — 62 commit trong 12 tháng, gấp 2.3x file thứ nhì. Mỗi commit upstream chạm src/stream.ts từ nay phải được map thủ công sang đúng module trong 4 file trên; không còn đối chiếu 1:1 theo dòng được nữa. Bảng map vùng: dựng request -> request-builder.ts; framing/timeout -> response-stream.ts; block/thinking/tool-call/usage/stopReason -> response-assembler.ts; delay/deadline/capacity log -> transport.ts; còn lại (auth 403, capacity, rate limit, profile) -> stream.ts. Cân nhắc nghiêm túc việc bỏ sync tự động và chuyển sang chỉ port có chọn lọc theo bug/feature cụ thể."
+    },
+    {
+      "path": "packages/kiro-core/test/stream.test.ts",
+      "upstreamPath": "test/stream.test.ts",
+      "since": "2026-09-06",
+      "what": "Thêm makeRealBodyResponse dùng ReadableStream thật, và test 'reads a real ReadableStream body, taking its reader exactly once'.",
+      "why": "makeOkResponse trả reader MỚI mỗi lần gọi getReader(), trong khi body thật throw 'ReadableStream is locked' ở lần thứ hai. Nghĩa là mọi lỗi lấy reader hai lần đều pass test nhưng hỏng với service thật — đúng lỗi đã suýt lọt trong lúc tách response-stream.ts. Đã kiểm chứng: tái tạo lỗi thì test fail, khôi phục thì pass.",
+      "risk": "Không có; test này chỉ chặt hơn bản cũ."
+    },
+    {
+      "path": "packages/kiro-core/src/event-parser.ts, packages/kiro-core/src/types.ts, packages/kiro-core/src/response-assembler.ts",
+      "upstreamPath": "src/event-parser.ts",
+      "since": "2026-09-06",
+      "what": "Frame `usage` nhận thêm dạng billing: {unit:'credit', unitPlural:'credits', usage:<number>} -> KiroUsage.credits/creditUnit. Dạng object (inputTokens/outputTokens) vẫn giữ.",
+      "why": "Đo thật 2026-09-06 (claude-sonnet-5, us-east-1): Kiro KHÔNG gửi token count. Frame usage là bản ghi credit, và `usage` là NUMBER chứ không phải object — nên `u.inputTokens` luôn undefined. Đường token của provider chưa bao giờ chạy với Kiro thật: usage.input luôn đến từ contextUsagePercentage × contextWindow, usage.output luôn từ ước lượng tiktoken. Credit là con số chi phí thật và trước đây bị vứt hoàn toàn.",
+      "risk": "Nếu Kiro bổ sung token count dạng object, nhánh cũ vẫn xử lý. Test: packages/kiro-core/test/event-parser.test.ts, 'parses the credit billing frame Kiro really emits'."
+    },
+    {
+      "path": "packages/kiro-core/src/stream.ts",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-06",
+      "what": "Bỏ marker <thinking_mode>/<max_thinking_length> khi request đã gửi field `thinking` của catalog (Claude có schema + có effort). Vẫn giữ marker cho model không có effort schema, cho Claude không chọn effort, và không đụng tới GPT (field `reasoning`).",
+      "why": "Trùng lặp: marker nói lại bằng prose đúng thứ field `thinking` đã nói, và nhét budget phụ thuộc effort vào đầu system prompt. Đo thật 2026-09-06 (claude-sonnet-5, effort high): bỏ marker vẫn giữ nguyên thinking stream (1 block, độ dài tương đương).",
+      "risk": "KHÔNG phải tối ưu cache — giả thuyết ban đầu đã bị chính phép đo bác bỏ. Kiro có cache prefix server-side (lặp prefix ~0.035 credit so với ~0.066 khi mới), nhưng đổi effort vẫn miss dù system prompt giống hệt từng byte, và mỗi effort warm entry riêng: effort nằm trong additionalModelRequestFields nên là một phần cache key bất kể prompt. Đừng port thay đổi này với lý do tiết kiệm cache. Test: packages/kiro-core/test/stream.test.ts, describe 'legacy thinking markers'."
+    },
+    {
+      "path": "packages/kiro-core/src/response-assembler.ts (comment), README.md",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-06",
+      "what": "Ghi lại kết quả kiểm chứng heuristic stopReason. KHÔNG đổi logic.",
+      "why": "Heuristic `!receivedContextUsage && emittedToolCalls === 0 -> length` giống hệt upstream. Đã đo 2026-09-06 trên 5 kịch bản (text ngắn, text ~5000 ký tự, turn có tool call, claude-haiku-4.5 không schema, glm-5): contextUsage xuất hiện trong cả 5. Giả định của heuristic đứng vững, nên giữ nguyên logic và chỉ thay comment 'chưa kiểm chứng' bằng kết quả đo.",
+      "risk": "Không có thay đổi hành vi. Nếu Kiro ngừng gửi contextUsage, response.done đã log receivedContextUsage để phát hiện."
     }
   ]
 }

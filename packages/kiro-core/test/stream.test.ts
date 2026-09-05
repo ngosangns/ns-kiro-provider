@@ -74,6 +74,25 @@ function makeOkResponse(body: string): Response {
   } as unknown as Response;
 }
 
+/**
+ * A response backed by a genuine ReadableStream.
+ *
+ * `makeOkResponse` hands out a fresh reader on every `getReader()` call, which a
+ * real body does not: the second call throws "ReadableStream is locked". Any
+ * code path that takes the reader twice therefore passes against the double and
+ * fails against the service, so at least one test has to use the real thing.
+ */
+function makeRealBodyResponse(body: string): Response {
+  const frames = encodeBody(body);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(frames);
+      controller.close();
+    },
+  });
+  return { ok: true, body: stream } as unknown as Response;
+}
+
 /** One response delivered as several reader chunks, so mid-event splits are exercised. */
 function makeChunkedResponse(chunks: string[]): Response {
   const read = vi.fn();
@@ -510,6 +529,89 @@ describe("streamKiro — stop reason and usage", () => {
     expect(usage.input).toBe(120);
     expect(usage.output).toBe(7);
     expect(usage.totalTokens).toBe(127);
+  });
+
+  // The legacy markers restate what the structured `thinking` field already
+  // says, and push an effort-dependent budget into the system prompt. They are
+  // dropped wherever the structured field is sent, and kept wherever it is not.
+  describe("legacy thinking markers", () => {
+    const CLAUDE_SCHEMA = {
+      type: "object",
+      properties: {
+        thinking: { type: "object", properties: { display: { type: "string", enum: ["summarized", "omitted"] } } },
+        output_config: { type: "object", properties: { effort: { type: "string", enum: ["low", "high", "max"] } } },
+      },
+    };
+
+    /** The content actually sent, which is where the system prompt is prepended. */
+    async function sentSystemPrompt(overrides: Partial<KiroStreamRequest>): Promise<string> {
+      const fetchMock = stubFetch(makeOkResponse(TEXT_ONLY));
+      await collect(streamKiro(makeRequest(overrides)));
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      return body.conversationState.currentMessage.userInputMessage.content;
+    }
+
+    it("omits the legacy markers when the structured thinking field is sent", async () => {
+      const content = await sentSystemPrompt({
+        model: makeModel({ reasoning: true, additionalModelRequestFieldsSchema: CLAUDE_SCHEMA }),
+        effort: "high",
+        systemPrompt: "You are helpful",
+      });
+
+      expect(content).not.toContain("<thinking_mode>");
+      expect(content).toContain("You are helpful");
+    });
+
+    it("keeps the system prompt identical across a change of effort", async () => {
+      const model = makeModel({ reasoning: true, additionalModelRequestFieldsSchema: CLAUDE_SCHEMA });
+      const atHigh = await sentSystemPrompt({ model, effort: "high", systemPrompt: "You are helpful" });
+      const atMax = await sentSystemPrompt({ model, effort: "max", systemPrompt: "You are helpful" });
+
+      expect(atHigh).toBe(atMax);
+    });
+
+    it("still emits the markers when no structured effort field is available", async () => {
+      const content = await sentSystemPrompt({
+        model: makeModel({ reasoning: true }),
+        systemPrompt: "You are helpful",
+      });
+
+      expect(content).toContain("<thinking_mode>enabled</thinking_mode>");
+    });
+  });
+
+  it("reads a real ReadableStream body, taking its reader exactly once", async () => {
+    stubFetch(makeRealBodyResponse('{"content":"Hi"}{"usage":{"inputTokens":9,"outputTokens":2}}'));
+    const events = await collect(streamKiro(makeRequest()));
+
+    expect(events.find((e) => e.type === "text_end")).toMatchObject({ text: "Hi" });
+    expect(events.find((e) => e.type === "done")).toBeDefined();
+  });
+
+  it("surfaces cache counts the usage frame reports", async () => {
+    stubFetch(
+      makeOkResponse(
+        '{"content":"Hi"}{"usage":{"inputTokens":1000,"outputTokens":7,"cacheReadInputTokens":900,"cacheWriteInputTokens":120}}{"contextUsagePercentage":10}',
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { cacheRead?: number; cacheWrite?: number } })
+      .usage;
+    expect(usage.cacheRead).toBe(900);
+    expect(usage.cacheWrite).toBe(120);
+  });
+
+  it("leaves cache counts absent when the usage frame reports none", async () => {
+    stubFetch(
+      makeOkResponse('{"content":"Hi"}{"usage":{"inputTokens":120,"outputTokens":7}}{"contextUsagePercentage":10}'),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { cacheRead?: number; cacheWrite?: number } })
+      .usage;
+    expect(usage.cacheRead).toBeUndefined();
+    expect(usage.cacheWrite).toBeUndefined();
   });
 
   it("estimates output tokens when the wire reports none, so tool-only turns are not zero", async () => {

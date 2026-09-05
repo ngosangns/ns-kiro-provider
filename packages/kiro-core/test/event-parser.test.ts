@@ -82,6 +82,46 @@ describe("Feature 8: Stream Event Parsing", () => {
       expect(e?.type === "usage" && e.data.outputTokens).toBe(50);
     });
 
+    // What Kiro actually sends: `usage` is the billed amount, not an object.
+    it("parses the credit billing frame Kiro really emits", () => {
+      const e = parseKiroEvent({ unit: "credit", unitPlural: "credits", usage: 0.06586360271973467 });
+      expect(e?.type === "usage" && e.data.credits).toBe(0.06586360271973467);
+      expect(e?.type === "usage" && e.data.creditUnit).toBe("credit");
+      expect(e?.type === "usage" && e.data.inputTokens).toBeUndefined();
+    });
+
+    it("ignores a negative billed amount", () => {
+      expect(parseKiroEvent({ unit: "credit", usage: -1 })).toBeNull();
+    });
+
+    it("omits cache counts when the usage frame carries none", () => {
+      const e = parseKiroEvent({ usage: { inputTokens: 100, outputTokens: 50 } });
+      expect(e?.type === "usage" && e.data).toEqual({ inputTokens: 100, outputTokens: 50 });
+    });
+
+    it.each([
+      ["Bedrock spelling", { cacheReadInputTokens: 900, cacheWriteInputTokens: 120 }],
+      ["Anthropic spelling", { cache_read_input_tokens: 900, cache_creation_input_tokens: 120 }],
+    ])("reads cache counts in the %s", (_label, cacheFields) => {
+      const e = parseKiroEvent({ usage: { inputTokens: 1000, outputTokens: 20, ...cacheFields } });
+      expect(e?.type === "usage" && e.data.cacheReadTokens).toBe(900);
+      expect(e?.type === "usage" && e.data.cacheWriteTokens).toBe(120);
+    });
+
+    it("treats a zero cache read as reported, not absent", () => {
+      const e = parseKiroEvent({ usage: { inputTokens: 10, cacheReadInputTokens: 0 } });
+      expect(e?.type === "usage" && e.data.cacheReadTokens).toBe(0);
+    });
+
+    it("ignores non-numeric and negative token counts", () => {
+      const e = parseKiroEvent({
+        usage: { inputTokens: "120", outputTokens: 7, cacheReadInputTokens: -1 },
+      });
+      expect(e?.type === "usage" && e.data.inputTokens).toBeUndefined();
+      expect(e?.type === "usage" && e.data.outputTokens).toBe(7);
+      expect(e?.type === "usage" && e.data.cacheReadTokens).toBeUndefined();
+    });
+
     it("returns null for unrecognized shape", () => {
       expect(parseKiroEvent({ unknown: true })).toBeNull();
     });

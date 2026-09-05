@@ -12,8 +12,57 @@ export type KiroWireEvent =
   | { type: "toolUseStop"; data: { stop: boolean } }
   | { type: "contextUsage"; data: { contextUsagePercentage: number } }
   | { type: "followupPrompt"; data: string }
-  | { type: "usage"; data: { inputTokens?: number; outputTokens?: number } }
+  | { type: "usage"; data: KiroWireUsage }
   | { type: "error"; data: { error: string; message?: string } };
+
+/**
+ * What a `usage` frame reports.
+ *
+ * Observed 2026-09-06 against `claude-sonnet-5` in us-east-1: Kiro does not
+ * send token counts at all. The frame is a billing record —
+ * `{unit: "credit", unitPlural: "credits", usage: 0.0659}` — so `usage` is a
+ * NUMBER, not an object, and reading `inputTokens` off it silently yields
+ * nothing. Token counts are still parsed because the object form is what the
+ * underlying services emit and Kiro may yet expose it.
+ *
+ * Kiro does cache prompts server-side (a repeated prefix billed 0.0350 against
+ * 0.0659 for a fresh one, and a changed prefix went straight back to 0.0659),
+ * but it reports no cache token counts and its request schema
+ * (`additionalProperties: false`) offers no way to ask for caching. The cache
+ * fields below are therefore read defensively, in the spellings the upstream
+ * services use, and stay `undefined` when absent rather than becoming `0`.
+ */
+export interface KiroWireUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  /** Billed amount for the turn — the only usage figure Kiro actually reports. */
+  credits?: number;
+  /** Unit the amount is denominated in, e.g. `"credit"`. */
+  creditUnit?: string;
+}
+
+/** Accept only a finite, non-negative count; anything else is treated as absent. */
+function tokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function firstTokenCount(source: Record<string, unknown>, keys: readonly string[]): number | undefined {
+  for (const key of keys) {
+    const count = tokenCount(source[key]);
+    if (count !== undefined) return count;
+  }
+  return undefined;
+}
+
+const CACHE_READ_KEYS = ["cacheReadInputTokens", "cache_read_input_tokens", "cacheReadTokens"] as const;
+const CACHE_WRITE_KEYS = [
+  "cacheWriteInputTokens",
+  "cache_creation_input_tokens",
+  "cacheCreationInputTokens",
+  "cacheWriteTokens",
+] as const;
 
 export function parseKiroEvent(parsed: Record<string, unknown>): KiroWireEvent | null {
   if (parsed.content !== undefined) return { type: "content", data: parsed.content as string };
@@ -55,10 +104,29 @@ export function parseKiroEvent(parsed: Record<string, unknown>): KiroWireEvent |
     return { type: "error", data: { error: typeof error === "string" ? error : JSON.stringify(error), message } };
   }
   if (parsed.usage !== undefined) {
+    // The billing form: `usage` is the amount itself, with the unit alongside it.
+    if (typeof parsed.usage === "number") {
+      const credits = tokenCount(parsed.usage);
+      if (credits === undefined) return null;
+      return {
+        type: "usage",
+        data: {
+          credits,
+          ...(typeof parsed.unit === "string" && parsed.unit ? { creditUnit: parsed.unit } : {}),
+        },
+      };
+    }
     const u = parsed.usage as Record<string, unknown>;
+    const cacheReadTokens = firstTokenCount(u, CACHE_READ_KEYS);
+    const cacheWriteTokens = firstTokenCount(u, CACHE_WRITE_KEYS);
     return {
       type: "usage",
-      data: { inputTokens: u.inputTokens as number | undefined, outputTokens: u.outputTokens as number | undefined },
+      data: {
+        inputTokens: tokenCount(u.inputTokens),
+        outputTokens: tokenCount(u.outputTokens),
+        ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+        ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+      },
     };
   }
   return null;
