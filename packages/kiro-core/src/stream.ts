@@ -962,7 +962,11 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
         blocks.setText(textBlockIndex, "");
         console.warn(`[kiro-core] Echo loop — stripping "Continue" response`);
       } else if (!hasText && !sawAnyToolCalls) {
-        console.warn(`[kiro-core] Empty response after ${maxRetries} retries — reporting a normal stop`);
+        // The stop reason is still decided below, and an empty turn that never
+        // carried a contextUsage frame is reported as `length` rather than
+        // `stop` — say so, instead of promising a normal stop this branch does
+        // not actually guarantee.
+        console.warn(`[kiro-core] Empty response after ${maxRetries} retries — giving up on this turn`);
       }
     }
 
@@ -986,6 +990,15 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
     // were all dropped for unparseable input must not report `toolUse`, because
     // an empty turn with a tool-use stop stalls an agent loop waiting for
     // results that will never arrive.
+    //
+    // `length` is inferred, not reported: Kiro sends no stop reason, so a turn
+    // that produced no tool call and never carried a contextUsage frame is
+    // treated as cut short. That rests on contextUsage closing every complete
+    // response — an assumption this provider inherited and has not verified.
+    // It matters because a host reads `length` as truncation and prepends
+    // TRUNCATION_NOTICE to the next turn, so a complete response misread here
+    // asks the model to continue something it already finished. `response.done`
+    // logs the deciding input so a real session can settle it.
     const stopReason =
       !receivedContextUsage && emittedToolCalls === 0 ? "length" : emittedToolCalls > 0 ? "toolUse" : "stop";
     yield* drain(pending);
@@ -993,6 +1006,7 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
     yield { type: "done", stopReason };
     debugLog("response.done", {
       stopReason,
+      receivedContextUsage,
       emittedToolCalls,
       sawAnyToolCalls,
       textLen: responseText.length,
