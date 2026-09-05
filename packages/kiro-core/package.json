@@ -12,6 +12,11 @@
     }
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngosangns/ns-kiro-provider.git",
+    "directory": "packages/kiro-core"
+  },
   "files": [
     "dist",
     "README.md"

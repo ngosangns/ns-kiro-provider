@@ -88,6 +88,25 @@ jobs:
             esac
           done
 
+      # Provenance is verified by the registry, not by `npm publish --dry-run`,
+      # so a package whose repository.url does not match the workflow's own
+      # repository fails only on the real upload. Check it here instead.
+      - name: Verify each package declares this repository
+        run: |
+          expected="https://github.com/${{ github.repository }}"
+          mismatch=0
+          for tarball in tarballs/*.tgz; do
+            url=$(tar -xzOf "$tarball" package/package.json | node -p "(JSON.parse(require('fs').readFileSync(0,'utf8')).repository || {}).url || ''")
+            normalized="${url#git+}"
+            normalized="${normalized%.git}"
+            echo "$tarball -> ${normalized:-<none>}"
+            if [ "$normalized" != "$expected" ]; then
+              echo "::error::$tarball declares '${url:-<none>}' but provenance requires $expected"
+              mismatch=1
+            fi
+          done
+          exit $mismatch
+
       # Order matters: the adapters pin an exact ns-kiro-core version, so
       # publishing them first would leave them briefly uninstallable.
       #
