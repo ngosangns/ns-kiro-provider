@@ -1,6 +1,6 @@
 {
   "name": "ns-kiro-core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared Kiro (AWS CodeWhisperer/Q) protocol core — credentials, model catalog, streaming; a dependency, not for direct install",
   "type": "module",
   "main": "./dist/index.js",

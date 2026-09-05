@@ -16,7 +16,7 @@ kiro-cli login
 dsh plugin --profile <profile> add ns-dsh-llm-kiro
 ```
 
-Pin a version with `add ns-dsh-llm-kiro@0.2.0` — `dsh plugin add` forwards
+Pin a version with `add ns-dsh-llm-kiro@0.2.1` — `dsh plugin add` forwards
 straight to `pnpm add`, which resolves bare names and `name@version` from the
 registry same as any other package.
 
