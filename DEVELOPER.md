@@ -131,7 +131,7 @@ breaks publishing until the trusted publisher is updated to match.
 3. Tag and push:
 
    ```bash
-   git tag v0.2.0 && git push origin v0.2.0
+   git tag v0.2.2 && git push origin v0.2.2
    ```
 
 The workflow re-runs lint, build, typecheck and tests, refuses to continue if

@@ -11,17 +11,26 @@ and its streaming wire protocol. That layer lives once, in `ns-kiro-core`, and e
 adapter is thin.
 
 ```
-┌─────────────────────── ns-kiro-core ───────────────────────┐
-│  endpoints · model catalog + cache · kiro-cli credentials  │
-│ token refresh · AWS event-stream framing · thinking parser │
-│ tool-call recovery · history repair · retry classification │
-└───────────────┬────────────────────────────┬───────────────┘
+┌────────────────────────── ns-kiro-core ──────────────────────────┐
+│ credentials: kiro-cli store · Kiro IDE token · API key · refresh │
+│ catalog: endpoints · model list + cache · effort ladders · rates │
+├──────────────────────────────────────────────────────────────────┤
+│  one call, in stages:                                            │
+│    request-builder  neutral messages → request, history repair   │
+│    transport        deadlines, backoff, capacity logging         │
+│    response-stream  AWS event-stream framing, stall timeouts     │
+│    response-assembler  blocks, thinking, tool calls, usage       │
+│    stream           orchestration: auth rotation, retry policy   │
+└───────────────┬────────────────────────────┬─────────────────────┘
                 │                            │
       ns-omp-provider-kiro            ns-dsh-llm-kiro
     registerProvider("kiro")   registerAdapter(["kiro"], …)
                 │                            │
              omp 18.x                     dsh 0.1.x
 ```
+
+Each stage is exported, so a caller can drive one on its own — building a
+request without sending it, or assembling blocks from events sourced elsewhere.
 
 ## Requirements
 
@@ -128,11 +137,16 @@ the credential, which is what a single-account machine wants.
 
 ## Packages
 
-| Package | What it is |
-| --- | --- |
-| [`ns-kiro-core`](packages/kiro-core) | The Kiro protocol, with no host types in it |
-| [`ns-omp-provider-kiro`](packages/omp-provider-kiro) | OMP extension |
-| [`ns-dsh-llm-kiro`](packages/dsh-llm-kiro) | DeepSeek Harness Cordis plugin |
+| Package | What it is | npm |
+| --- | --- | --- |
+| [`ns-kiro-core`](packages/kiro-core) | The Kiro protocol, with no host types in it | [![npm](https://img.shields.io/npm/v/ns-kiro-core)](https://www.npmjs.com/package/ns-kiro-core) |
+| [`ns-omp-provider-kiro`](packages/omp-provider-kiro) | OMP extension | [![npm](https://img.shields.io/npm/v/ns-omp-provider-kiro)](https://www.npmjs.com/package/ns-omp-provider-kiro) |
+| [`ns-dsh-llm-kiro`](packages/dsh-llm-kiro) | DeepSeek Harness Cordis plugin | [![npm](https://img.shields.io/npm/v/ns-dsh-llm-kiro)](https://www.npmjs.com/package/ns-dsh-llm-kiro) |
+
+All three are published together from a tag, with
+[provenance](https://docs.npmjs.com/generating-provenance-statements) built and
+signed by GitHub Actions. Release notes are on the
+[releases page](https://github.com/ngosangns/ns-kiro-provider/releases).
 
 ## Development
 
