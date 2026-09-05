@@ -4,3 +4,5 @@ dist/
 .DS_Store
 .omp/
 .claude/settings.local.json
+tarballs/
+*.tgz
