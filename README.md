@@ -48,6 +48,12 @@ derived from the `contextUsagePercentage` frame, and `usage.output` from a
 tiktoken estimate over what the model emitted. `usage.credits` carries the
 figure Kiro actually bills.
 
+**Per-token prices: none.** Kiro bills in credits and publishes no per-token
+rates, so every model's `cost` stays zero. `kiro-cli chat --list-models` does
+publish a relative billing weight, which the catalog picks up as
+`rateMultiplier` — 2.2 for `claude-opus-5` against 0.05 for `qwen3-coder-next`.
+It is absent when kiro-cli is not installed.
+
 **Prompt caching: real, but not controllable.** Kiro caches prompts server-side
 on its own: a repeated prefix billed ~0.035 credits against ~0.066 for a fresh
 one, and a changed prefix went straight back to the full price. There is no way

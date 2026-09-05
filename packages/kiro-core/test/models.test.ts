@@ -170,6 +170,35 @@ describe("Feature 2: Model Definitions", () => {
       expect(mapped.find((model) => model.id === expected.id)).toMatchObject(expected);
     });
 
+    // Kiro publishes no per-token prices, so `cost` stays zero and the billing
+    // weight from kiro-cli is the only thing separating a cheap model from an
+    // expensive one.
+    it("attaches billing weights when kiro-cli supplied them", () => {
+      const withRates = mapKiroCatalogModels(
+        catalogFixture,
+        TEST_REGION,
+        new Map([
+          ["claude-opus-4.8", { multiplier: 2.2, unit: "Credit" }],
+          ["gpt-5.6-luna", { multiplier: 0.1 }],
+        ]),
+      );
+
+      expect(withRates.find((m) => m.id === "claude-opus-4-8")).toMatchObject({
+        rateMultiplier: 2.2,
+        rateUnit: "Credit",
+      });
+      const luna = withRates.find((m) => m.id === "gpt-5-6-luna");
+      expect(luna?.rateMultiplier).toBe(0.1);
+      expect(luna?.rateUnit).toBeUndefined();
+      // Rates are keyed by the exact service id; a model kiro-cli did not list
+      // stays rate-less rather than inheriting a neighbour's weight.
+      expect(withRates.find((m) => m.id === "qwen3-coder-next")?.rateMultiplier).toBeUndefined();
+    });
+
+    it("leaves every model rate-less when kiro-cli is unavailable", () => {
+      expect(mapped.every((model) => model.rateMultiplier === undefined)).toBe(true);
+    });
+
     it("advertises verified Luna vision without broadening other non-Claude models", () => {
       expect(mapped.find((model) => model.id === "gpt-5-6-luna")?.input).toEqual(["text", "image"]);
       expect(mapped.find((model) => model.id === "openai-gpt-5-6")?.input).toEqual(["text"]);

@@ -87,6 +87,18 @@ export interface KiroModelSpec {
   additionalModelRequestFieldsSchema?: unknown;
   input: ("text" | "image")[];
   cost: KiroCost;
+  /**
+   * How much this model bills relative to the baseline — 2.2 costs 2.2x what a
+   * 1.0 model does for the same work. Kiro publishes no per-token prices, so
+   * {@link cost} stays zero and this is the only cost signal available; the
+   * absolute amount for a turn arrives as {@link KiroUsage.credits}.
+   *
+   * Sourced from kiro-cli, which the management catalog does not carry, so it
+   * is absent when kiro-cli is not installed.
+   */
+  rateMultiplier?: number;
+  /** Unit {@link rateMultiplier} applies to, e.g. `"Credit"`. */
+  rateUnit?: string;
   contextWindow: number;
   maxTokens: number;
   /** Kiro API region this model is served from. */

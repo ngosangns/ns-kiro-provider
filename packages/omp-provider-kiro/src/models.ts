@@ -23,6 +23,14 @@ export interface OmpKiroModelConfig {
   kiroModelId: string;
   /** Catalog schema this model's structured effort/thinking fields derive from. */
   additionalModelRequestFieldsSchema?: Record<string, unknown>;
+  /**
+   * Relative billing weight, when kiro-cli published one. Carried through
+   * because `cost` cannot express it: Kiro bills in credits and publishes no
+   * per-token prices, so `cost` stays zero and this is what distinguishes an
+   * expensive model from a cheap one.
+   */
+  rateMultiplier?: number;
+  rateUnit?: string;
 }
 
 export function toOmpModelConfig(model: KiroModel): OmpKiroModelConfig {
@@ -47,6 +55,8 @@ export function toOmpModelConfig(model: KiroModel): OmpKiroModelConfig {
     ...(model.additionalModelRequestFieldsSchema
       ? { additionalModelRequestFieldsSchema: model.additionalModelRequestFieldsSchema }
       : {}),
+    ...(model.rateMultiplier !== undefined ? { rateMultiplier: model.rateMultiplier } : {}),
+    ...(model.rateUnit !== undefined ? { rateUnit: model.rateUnit } : {}),
   };
 }
 

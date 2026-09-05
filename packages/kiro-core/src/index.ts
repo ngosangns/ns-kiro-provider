@@ -42,8 +42,10 @@ export {
   getKiroCliCredentials,
   getKiroCliCredentialsAllowExpired,
   getKiroCliDbPath,
+  getKiroCliModelRates,
   getKiroCliSocialToken,
   getKiroCliSocialTokenAllowExpired,
+  type KiroModelRate,
   refreshViaKiroCli,
   saveKiroCliCredentials,
 } from "./kiro-cli.js";
