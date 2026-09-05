@@ -17,11 +17,20 @@ export type KiroAdditionalModelRequestFields =
       thinking: { type: "adaptive"; display?: "summarized" };
     };
 
-const GPT_EFFORT_VALUES = ["low", "medium", "high", "xhigh"] as const;
+const GPT_EFFORT_VALUES = ["low", "medium", "high", "xhigh", "max"] as const;
 const CLAUDE_EXTENDED_EFFORT_VALUES = ["low", "medium", "high", "xhigh", "max"] as const;
 const CLAUDE_MAX_EFFORT_VALUES = ["low", "medium", "high", "max"] as const;
 
+/**
+ * Kiro has served GPT models under two naming schemes — `openai-gpt-5.6` and
+ * the bare `gpt-5.6-<variant>` family — so match the segment rather than a
+ * single prefix. A prefix test on `openai-gpt` alone silently stopped matching
+ * when the catalog moved to the bare spelling.
+ */
+const GPT_MODEL_PATTERN = /(^|-)gpt-/;
+
 const CLAUDE_EXTENDED_EFFORT_MODELS = new Set([
+  "claude-opus-5",
   "claude-opus-4.8",
   "claude-opus-4.7",
   "claude-sonnet-5",
@@ -65,7 +74,7 @@ export function deriveKiroEffort(schema: unknown): KiroEffortConfig | undefined 
 /** Known-model compatibility used only before catalog schema metadata is available. */
 export function fallbackKiroEffort(kiroModelId: string): KiroEffortConfig | undefined {
   const normalizedId = kiroModelId.toLowerCase().replace(/(\d)-(\d)/g, "$1.$2");
-  if (normalizedId.startsWith("openai-gpt")) {
+  if (GPT_MODEL_PATTERN.test(normalizedId)) {
     return { field: "reasoning", values: GPT_EFFORT_VALUES, summarizedThinking: false };
   }
   if (CLAUDE_EXTENDED_EFFORT_MODELS.has(normalizedId)) {

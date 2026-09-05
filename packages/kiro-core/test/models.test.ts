@@ -2,7 +2,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deriveKiroEffort } from "../src/effort.js";
+import { deriveKiroEffort, fallbackKiroEffort } from "../src/effort.js";
 import type { KiroCatalogModel } from "../src/management.js";
 import {
   applyEffortLadder,
@@ -314,17 +314,22 @@ describe("Feature 2: Model Definitions", () => {
 
   describe("bootstrap model catalog", () => {
     it("keeps conservative, zero-cost bootstrap metadata", () => {
-      expect(kiroModels).toHaveLength(15);
+      expect(kiroModels).toHaveLength(20);
       expect(kiroModels.every((model) => model.cost.input === 0 && model.cost.output === 0)).toBe(true);
       expect(kiroModels.find((model) => model.id === "claude-haiku-4-5")?.reasoning).toBe(false);
       expect(kiroModels.find((model) => model.id === "minimax-m2-1")?.reasoning).toBe(false);
     });
 
-    it("uses image input for Claude and text input for other concrete bootstrap models", () => {
+    it("uses image input for Claude and for the GPT variant that supports it", () => {
       const claudeModels = kiroModels.filter((model) => model.id.startsWith("claude-"));
-      const nonClaudeModels = kiroModels.filter((model) => !model.id.startsWith("claude-") && model.id !== "auto");
+      // `gpt-5-6-luna` is the one non-Claude bootstrap model with verified
+      // vision support; its `sol`/`terra` siblings are text-only.
+      const textOnlyModels = kiroModels.filter(
+        (model) => !model.id.startsWith("claude-") && model.id !== "auto" && model.id !== "gpt-5-6-luna",
+      );
       expect(claudeModels.every((model) => model.input.includes("text") && model.input.includes("image"))).toBe(true);
-      expect(nonClaudeModels.every((model) => model.input.length === 1 && model.input[0] === "text")).toBe(true);
+      expect(kiroModels.find((model) => model.id === "gpt-5-6-luna")?.input).toEqual(["text", "image"]);
+      expect(textOnlyModels.every((model) => model.input.length === 1 && model.input[0] === "text")).toBe(true);
     });
 
     it("disables text tool-call recovery only for Claude bootstrap models", () => {
@@ -341,7 +346,17 @@ describe("Feature 2: Model Definitions", () => {
     const THROUGH_HIGH = ["low", "medium", "high"] satisfies KiroEffort[];
     const THROUGH_XHIGH_AND_MAX = [...THROUGH_HIGH, "xhigh", "max"] satisfies KiroEffort[];
     const THROUGH_HIGH_AND_MAX = [...THROUGH_HIGH, "max"] satisfies KiroEffort[];
-    const XHIGH_AND_MAX_MODELS = ["claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-fable-5"];
+    const XHIGH_AND_MAX_MODELS = [
+      "claude-opus-5",
+      "claude-opus-4-8",
+      "claude-opus-4-7",
+      "claude-sonnet-5",
+      "claude-fable-5",
+      // GPT variants advertise the same ladder through the `reasoning` field.
+      "gpt-5-6-luna",
+      "gpt-5-6-sol",
+      "gpt-5-6-terra",
+    ];
     const MAX_WITHOUT_XHIGH_MODELS = ["claude-opus-4-6", "claude-sonnet-4-6"];
 
     it("advertises xhigh and max independently when both are supported", () => {
@@ -371,6 +386,26 @@ describe("Feature 2: Model Definitions", () => {
       for (const model of kiroModels.filter((candidate) => !candidate.reasoning)) {
         expect(model.efforts, `${model.id} efforts`).toBeUndefined();
       }
+    });
+
+    // Kiro renamed its GPT family from `openai-gpt-5.6` to bare `gpt-5.6-<variant>`.
+    // A prefix test on `openai-gpt` matched only the old spelling, leaving every
+    // current GPT model with no fallback ladder.
+    it.each([
+      "gpt-5.6-luna",
+      "gpt-5.6-sol",
+      "openai-gpt-5.6",
+    ])("derives the GPT reasoning ladder for %s without catalog schema", (kiroModelId) => {
+      expect(fallbackKiroEffort(kiroModelId)).toEqual({
+        field: "reasoning",
+        values: ["low", "medium", "high", "xhigh", "max"],
+        summarizedThinking: false,
+      });
+    });
+
+    it("does not mistake a non-GPT model for the GPT family", () => {
+      expect(fallbackKiroEffort("claude-haiku-4.5")).toBeUndefined();
+      expect(fallbackKiroEffort("glm-5")).toBeUndefined();
     });
   });
 
