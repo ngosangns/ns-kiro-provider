@@ -229,12 +229,16 @@ export class KiroResponseAssembler {
     //
     // `length` is inferred, not reported: Kiro sends no stop reason, so a turn
     // that produced no tool call and never carried a contextUsage frame is
-    // treated as cut short. That rests on contextUsage closing every complete
-    // response — an assumption this provider inherited and has not verified.
-    // It matters because a host reads `length` as truncation and prepends
-    // TRUNCATION_NOTICE to the next turn, so a complete response misread here
-    // asks the model to continue something it already finished. `response.done`
-    // logs the deciding input so a real session can settle it.
+    // treated as cut short.
+    //
+    // That rests on contextUsage closing every complete response. Checked
+    // 2026-09-06 across a short reply, a ~5000-character one, a tool-call turn,
+    // a model with no effort schema (claude-haiku-4.5) and a non-Claude model
+    // (glm-5): the frame arrived in all five, so its absence really does mark an
+    // abnormal turn. `response.done` logs `receivedContextUsage` in case a later
+    // Kiro stops sending it — a false `length` is read by hosts as truncation
+    // and prepends TRUNCATION_NOTICE, asking the model to continue work it
+    // already finished.
     const stopReason =
       !this.receivedContextUsage && this.emittedToolCalls === 0
         ? "length"

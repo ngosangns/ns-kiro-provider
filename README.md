@@ -59,6 +59,12 @@ field is rejected rather than honoured. Kiro also reports no cache token counts.
 Reasoning effort is part of the cache key: changing it misses even when the
 prompt is byte-identical, and each effort level then warms its own entry.
 
+**Stop reasons: inferred.** Kiro sends none, so a turn with no tool call that
+never carried a `contextUsagePercentage` frame is reported as `length`. The
+frame arrived in every case checked — a short reply, a ~5000-character one, a
+tool-call turn, a model with no effort schema, and a non-Claude model — so its
+absence does mark an abnormal turn rather than a normal short answer.
+
 Set `KIRO_DEBUG=1` to log the frames verbatim (`~/.ns-kiro-provider/logs/`) if
 any of this needs re-checking against a newer Kiro.
 

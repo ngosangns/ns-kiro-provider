@@ -59,15 +59,42 @@
       "path": "CHANGELOG.md",
       "reason": "Lịch sử release của upstream. Đọc để lấy ngữ cảnh, không copy vào repo này."
     },
-    { "path": "RELEASE.md", "reason": "Quy trình release riêng của upstream." },
-    { "path": "AGENTS.md", "reason": "Hướng dẫn agent riêng của upstream." },
-    { "path": "CLAUDE.md", "reason": "Hướng dẫn agent riêng của upstream." },
-    { "path": "ralph.yml", "reason": "Harness riêng của upstream." },
-    { "path": "Dockerfile.lint", "reason": "Hạ tầng lint riêng của upstream." },
-    { "path": "fix-lint-all-branches.sh", "reason": "Script one-off của upstream." },
-    { "path": "docs/**", "reason": "Ngoài phạm vi." },
-    { "path": "scripts/**", "reason": "Script one-off của upstream." },
-    { "path": "package-lock.json", "reason": "Repo này dùng pnpm workspace." }
+    {
+      "path": "RELEASE.md",
+      "reason": "Quy trình release riêng của upstream."
+    },
+    {
+      "path": "AGENTS.md",
+      "reason": "Hướng dẫn agent riêng của upstream."
+    },
+    {
+      "path": "CLAUDE.md",
+      "reason": "Hướng dẫn agent riêng của upstream."
+    },
+    {
+      "path": "ralph.yml",
+      "reason": "Harness riêng của upstream."
+    },
+    {
+      "path": "Dockerfile.lint",
+      "reason": "Hạ tầng lint riêng của upstream."
+    },
+    {
+      "path": "fix-lint-all-branches.sh",
+      "reason": "Script one-off của upstream."
+    },
+    {
+      "path": "docs/**",
+      "reason": "Ngoài phạm vi."
+    },
+    {
+      "path": "scripts/**",
+      "reason": "Script one-off của upstream."
+    },
+    {
+      "path": "package-lock.json",
+      "reason": "Repo này dùng pnpm workspace."
+    }
   ],
   "localOnly": [
     "packages/kiro-core/src/types.ts",
@@ -140,6 +167,14 @@
       "what": "Bỏ marker <thinking_mode>/<max_thinking_length> khi request đã gửi field `thinking` của catalog (Claude có schema + có effort). Vẫn giữ marker cho model không có effort schema, cho Claude không chọn effort, và không đụng tới GPT (field `reasoning`).",
       "why": "Trùng lặp: marker nói lại bằng prose đúng thứ field `thinking` đã nói, và nhét budget phụ thuộc effort vào đầu system prompt. Đo thật 2026-09-06 (claude-sonnet-5, effort high): bỏ marker vẫn giữ nguyên thinking stream (1 block, độ dài tương đương).",
       "risk": "KHÔNG phải tối ưu cache — giả thuyết ban đầu đã bị chính phép đo bác bỏ. Kiro có cache prefix server-side (lặp prefix ~0.035 credit so với ~0.066 khi mới), nhưng đổi effort vẫn miss dù system prompt giống hệt từng byte, và mỗi effort warm entry riêng: effort nằm trong additionalModelRequestFields nên là một phần cache key bất kể prompt. Đừng port thay đổi này với lý do tiết kiệm cache. Test: packages/kiro-core/test/stream.test.ts, describe 'legacy thinking markers'."
+    },
+    {
+      "path": "packages/kiro-core/src/response-assembler.ts (comment), README.md",
+      "upstreamPath": "src/stream.ts",
+      "since": "2026-09-06",
+      "what": "Ghi lại kết quả kiểm chứng heuristic stopReason. KHÔNG đổi logic.",
+      "why": "Heuristic `!receivedContextUsage && emittedToolCalls === 0 -> length` giống hệt upstream. Đã đo 2026-09-06 trên 5 kịch bản (text ngắn, text ~5000 ký tự, turn có tool call, claude-haiku-4.5 không schema, glm-5): contextUsage xuất hiện trong cả 5. Giả định của heuristic đứng vững, nên giữ nguyên logic và chỉ thay comment 'chưa kiểm chứng' bằng kết quả đo.",
+      "risk": "Không có thay đổi hành vi. Nếu Kiro ngừng gửi contextUsage, response.done đã log receivedContextUsage để phát hiện."
     }
   ]
 }
