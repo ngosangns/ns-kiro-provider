@@ -8,7 +8,7 @@ Published on npm as `ns-omp-provider-kiro`:
 omp plugin install ns-omp-provider-kiro
 ```
 
-Pin a version with `omp plugin install ns-omp-provider-kiro@0.1.2` — bare
+Pin a version with `omp plugin install ns-omp-provider-kiro@0.2.0` — bare
 names, scoped names, and `name@version` all resolve as npm specs.
 
 ### From a local build
