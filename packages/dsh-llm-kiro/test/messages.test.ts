@@ -1,7 +1,7 @@
 // ABOUTME: Tests the projection from the Harness conversation vocabulary onto the neutral one.
 
 import type { AttachmentId } from "@deepseek-ai/dsh-attachment";
-import type { CallId, Message } from "@deepseek-ai/dsh-llm";
+import type { Message, ToolCallId } from "@deepseek-ai/dsh-llm";
 import { describe, expect, it } from "vitest";
 import { toKiroMessages } from "../src/messages.js";
 
@@ -35,13 +35,13 @@ describe("toKiroMessages", () => {
     const out = await toKiroMessages([
       message({
         role: "user",
-        content: [{ type: "tool-result", toolCallId: "c1" as CallId, content: [{ type: "text", text: "ok" }] }],
+        content: [{ type: "tool-result", toolCallId: "c1" as ToolCallId, content: [{ type: "text", text: "ok" }] }],
       }),
     ]);
     expect(out.messages).toEqual([
       {
         role: "toolResult",
-        toolCallId: "c1" as CallId,
+        toolCallId: "c1" as ToolCallId,
         toolName: "tool",
         content: [{ type: "text", text: "ok" }],
         isError: false,
@@ -55,7 +55,7 @@ describe("toKiroMessages", () => {
         role: "user",
         content: [
           { type: "text", text: "context" },
-          { type: "tool-result", toolCallId: "c1" as CallId, content: [{ type: "text", text: "ok" }] },
+          { type: "tool-result", toolCallId: "c1" as ToolCallId, content: [{ type: "text", text: "ok" }] },
         ],
       }),
     ]);
@@ -67,7 +67,12 @@ describe("toKiroMessages", () => {
       message({
         role: "user",
         content: [
-          { type: "tool-result", toolCallId: "c1" as CallId, isError: true, content: [{ type: "text", text: "boom" }] },
+          {
+            type: "tool-result",
+            toolCallId: "c1" as ToolCallId,
+            isError: true,
+            content: [{ type: "text", text: "boom" }],
+          },
         ],
       }),
     ]);
@@ -80,13 +85,13 @@ describe("toKiroMessages", () => {
         role: "assistant",
         content: [
           { type: "reasoning", text: "hmm" },
-          { type: "tool-call", id: "c1" as CallId, name: "read", arguments: '{"path":"a"}' },
+          { type: "tool-call", id: "c1" as ToolCallId, name: "read", arguments: '{"path":"a"}' },
         ],
       }),
     ]);
     expect(out.messages[0]?.content).toEqual([
       { type: "thinking", thinking: "hmm" },
-      { type: "toolCall", id: "c1" as CallId, name: "read", arguments: { path: "a" } },
+      { type: "toolCall", id: "c1" as ToolCallId, name: "read", arguments: { path: "a" } },
     ]);
   });
 
@@ -94,10 +99,12 @@ describe("toKiroMessages", () => {
     const out = await toKiroMessages([
       message({
         role: "assistant",
-        content: [{ type: "tool-call", id: "c1" as CallId, name: "read", arguments: "{not json" }],
+        content: [{ type: "tool-call", id: "c1" as ToolCallId, name: "read", arguments: "{not json" }],
       }),
     ]);
-    expect(out.messages[0]?.content).toEqual([{ type: "toolCall", id: "c1" as CallId, name: "read", arguments: {} }]);
+    expect(out.messages[0]?.content).toEqual([
+      { type: "toolCall", id: "c1" as ToolCallId, name: "read", arguments: {} },
+    ]);
   });
 
   it("drops images when no attachment store is available", async () => {

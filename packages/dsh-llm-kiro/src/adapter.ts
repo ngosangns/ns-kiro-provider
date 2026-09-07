@@ -2,7 +2,6 @@
 
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 import {
-  type CallId,
   type GenerateOptions,
   LlmAdapter,
   LlmError,
@@ -11,6 +10,7 @@ import {
   type LlmResolvedModelInfo,
   type ReasoningEffortId,
   type StreamChunk,
+  type ToolCallId,
 } from "@deepseek-ai/dsh-llm";
 import {
   getCachedModels,
@@ -164,7 +164,7 @@ export class KiroAdapter extends LlmAdapter {
           yield {
             type: "tool-call-delta",
             index: event.index,
-            id: event.id as CallId,
+            id: event.id as ToolCallId,
             name: event.name,
             argumentsDelta: "",
           };
@@ -173,7 +173,7 @@ export class KiroAdapter extends LlmAdapter {
           yield {
             type: "tool-call-delta",
             index: event.index,
-            id: event.id as CallId,
+            id: event.id as ToolCallId,
             argumentsDelta: event.argumentsDelta,
           };
           break;
@@ -184,7 +184,7 @@ export class KiroAdapter extends LlmAdapter {
             index: event.index,
             block: {
               type: "tool-call",
-              id: event.id as CallId,
+              id: event.id as ToolCallId,
               name: event.name,
               arguments: JSON.stringify(event.arguments),
             },
