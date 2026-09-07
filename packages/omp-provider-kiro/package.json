@@ -1,6 +1,6 @@
 {
   "name": "ns-omp-provider-kiro",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "OMP (oh-my-pi) provider plugin: adds Kiro (AWS CodeWhisperer/Q) models via your kiro-cli login",
   "type": "module",
   "main": "./dist/index.js",
@@ -57,8 +57,8 @@
     }
   },
   "devDependencies": {
-    "@oh-my-pi/pi-ai": "18.1.5",
-    "@oh-my-pi/pi-coding-agent": "18.1.5",
+    "@oh-my-pi/pi-ai": "18.1.13",
+    "@oh-my-pi/pi-coding-agent": "18.1.13",
     "@types/node": "^22.10.0"
   }
 }
