@@ -5,9 +5,10 @@
     "remote": "upstream",
     "branch": "main"
   },
-  "syncedCommit": "111a1b14682e34b30ec721fbce4e8f6d98986ec4",
+  "syncedCommit": "1e4295b3dc8cc21a3da3eaead5af499dbdcd370c",
   "syncedTag": "v0.10.2",
-  "syncedAt": "2026-09-04",
+  "syncedAt": "2026-09-18",
+  "_partialSyncNote": "syncedCommit trỏ tới 1e4295b3d ('fix: resolve ksk_ API key profiles via GetProfile'), commit đầu tiên sau tag v0.10.2 — chỉ commit này được port (targeted bugfix cho lỗi 403 ListAvailableProfiles của API key). syncedTag vẫn là v0.10.2 vì 1e4295b3d chưa nằm trong release tag nào của upstream (mục 'Unreleased' trong CHANGELOG). Còn 32 commit khác giữa v0.10.2 và upstream/main (0a023d524) CHƯA được đánh giá/port — chạy lại upstream-status.mjs để lấy danh sách đầy đủ.",
   "pathMapping": {
     "src/bracket-tool-parser.ts": "packages/kiro-core/src/bracket-tool-parser.ts",
     "src/debug.ts": "packages/kiro-core/src/debug.ts",
