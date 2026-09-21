@@ -30,7 +30,12 @@ export async function loginKiro(callbacks: OAuthLoginCallbacks): Promise<OAuthCr
 
   if (!callbacks.onPrompt) throw new Error(NO_SESSION_MESSAGE);
   const apiKey = (
-    await callbacks.onPrompt({ message: NO_SESSION_MESSAGE, placeholder: "ksk_…", allowEmpty: true })
+    await callbacks.onPrompt({
+      message: NO_SESSION_MESSAGE,
+      placeholder: "ksk_…",
+      allowEmpty: true,
+      secret: true,
+    })
   ).trim();
   if (!apiKey) throw new Error(NO_SESSION_MESSAGE);
   return (await loginKiroWithApiKey(apiKey, callbacks.onProgress)) as unknown as OAuthCredentials;

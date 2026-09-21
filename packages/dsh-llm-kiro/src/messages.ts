@@ -1,7 +1,7 @@
 // ABOUTME: Projects the Harness conversation vocabulary onto the neutral one kiro-core reads.
 
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
-import type { ContentBlock, Message, ToolResultBlock } from "@deepseek-ai/dsh-llm";
+import { type ContentBlock, fileHandleText, type Message, type ToolResultBlock } from "@deepseek-ai/dsh-llm";
 import type { KiroAssistantContent, KiroMessage, KiroUserContent } from "ns-kiro-core";
 
 /**
@@ -23,7 +23,15 @@ async function userContent(
   for (const block of blocks) {
     if (block.type === "text") out.push({ type: "text", text: block.text });
     else if (block.type === "reasoning") out.push({ type: "text", text: block.text });
-    else if (block.type === "image" && context.attachments) {
+    else if (block.type === "file") {
+      // Files never go to a provider as bytes: the harness projects them to
+      // handle text, and a hand-built call that still carries a file block
+      // gets the same representation here.
+      out.push({
+        type: "text",
+        text: fileHandleText(block.attachment, context.attachments?.fileHostPath(block.attachment)),
+      });
+    } else if (block.type === "image" && context.attachments) {
       const stored = await context.attachments.readImage(block.attachment, context.signal);
       out.push({
         type: "image",

@@ -27,11 +27,11 @@
     "prepublishOnly": "pnpm run check && pnpm run build"
   },
   "dependencies": {
-    "@smithy/core": "^3.24.5",
+    "@smithy/core": "^3.34.1",
     "js-tiktoken": "^1.0.21"
   },
   "devDependencies": {
-    "@smithy/types": "^4.17.2",
-    "@types/node": "^22.10.0"
+    "@smithy/types": "^4.18.0",
+    "@types/node": "^22.20.4"
   }
 }

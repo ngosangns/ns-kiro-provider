@@ -420,17 +420,16 @@ describe("Feature 2: Model Definitions", () => {
     // Kiro renamed its GPT family from `openai-gpt-5.6` to bare `gpt-5.6-<variant>`.
     // A prefix test on `openai-gpt` matched only the old spelling, leaving every
     // current GPT model with no fallback ladder.
-    it.each([
-      "gpt-5.6-luna",
-      "gpt-5.6-sol",
-      "openai-gpt-5.6",
-    ])("derives the GPT reasoning ladder for %s without catalog schema", (kiroModelId) => {
-      expect(fallbackKiroEffort(kiroModelId)).toEqual({
-        field: "reasoning",
-        values: ["low", "medium", "high", "xhigh", "max"],
-        summarizedThinking: false,
-      });
-    });
+    it.each(["gpt-5.6-luna", "gpt-5.6-sol", "openai-gpt-5.6"])(
+      "derives the GPT reasoning ladder for %s without catalog schema",
+      (kiroModelId) => {
+        expect(fallbackKiroEffort(kiroModelId)).toEqual({
+          field: "reasoning",
+          values: ["low", "medium", "high", "xhigh", "max"],
+          summarizedThinking: false,
+        });
+      },
+    );
 
     it("does not mistake a non-GPT model for the GPT family", () => {
       expect(fallbackKiroEffort("claude-haiku-4.5")).toBeUndefined();

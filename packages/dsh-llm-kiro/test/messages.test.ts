@@ -123,6 +123,54 @@ describe("toKiroMessages", () => {
     expect(out.messages[0]?.content).toEqual([{ type: "text", text: "look" }]);
   });
 
+  it("projects a file block into handle text rather than dropping it", async () => {
+    const out = await toKiroMessages([
+      message({
+        role: "user",
+        content: [
+          { type: "text", text: "see" },
+          {
+            type: "file",
+            attachment: { attachmentId: "sha256:abcdef0123456789" as AttachmentId, name: "notes.txt", bytes: 12 },
+          },
+        ],
+      }),
+    ]);
+    expect(out.messages[0]?.content).toEqual([
+      { type: "text", text: "see" },
+      {
+        type: "text",
+        text: '[File "notes.txt" (12 bytes, sha256:abcdef01) was uploaded, but the current execution environment cannot access a readable path. Report that limitation if its contents are needed; do not claim to have read it.]',
+      },
+    ]);
+  });
+
+  it("includes the host path in file handle text when the attachment store can resolve it", async () => {
+    const attachments = {
+      fileHostPath: () => "/tmp/notes.txt",
+    } as never;
+    const out = await toKiroMessages(
+      [
+        message({
+          role: "user",
+          content: [
+            {
+              type: "file",
+              attachment: { attachmentId: "sha256:abcdef0123456789" as AttachmentId, name: "notes.txt", bytes: 12 },
+            },
+          ],
+        }),
+      ],
+      { attachments },
+    );
+    expect(out.messages[0]?.content).toEqual([
+      {
+        type: "text",
+        text: '[File "notes.txt" (12 bytes, sha256:abcdef01): verbatim read-only copy saved at "/tmp/notes.txt". Read that path with your file tools when its contents are needed; copy it to a writable location before modifying it. When delegating file work, include this saved path in the delegation prompt; only subagents sharing this execution environment can read it.]',
+      },
+    ]);
+  });
+
   it("reads image bytes through the attachment store when one is available", async () => {
     const attachments = {
       readImage: async () => ({ data: new Uint8Array([1, 2, 3]), ref: {} }),

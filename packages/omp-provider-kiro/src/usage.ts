@@ -1,6 +1,6 @@
 // ABOUTME: Projects Kiro's account usage onto OMP's normalized usage report.
 
-import type { UsageFetchParams, UsageProvider, UsageReport, UsageUnit } from "@oh-my-pi/pi-ai";
+import type { UsageFetchContext, UsageFetchParams, UsageProvider, UsageReport, UsageUnit } from "@oh-my-pi/pi-ai";
 import {
   fetchKiroUsage,
   type KiroCredentials,
@@ -86,7 +86,7 @@ export function toUsageReport(provider: string, usage: KiroProviderUsage, fetche
 export const kiroUsageProvider: UsageProvider = {
   id: "kiro",
 
-  async fetchUsage(params: UsageFetchParams): Promise<UsageReport | null> {
+  async fetchUsage(params: UsageFetchParams, _ctx: UsageFetchContext): Promise<UsageReport | null> {
     const token = params.credential.accessToken ?? params.credential.apiKey;
     if (!token) return null;
 

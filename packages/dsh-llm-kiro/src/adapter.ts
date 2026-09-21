@@ -65,7 +65,7 @@ export class KiroAdapter extends LlmAdapter {
     }));
   }
 
-  async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+  async resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo> {
     const known = this.catalog().find((candidate) => candidate.id === model);
     if (!known) throw new LlmError(`Unknown Kiro model: ${model}`, "UNKNOWN_MODEL");
     return {
