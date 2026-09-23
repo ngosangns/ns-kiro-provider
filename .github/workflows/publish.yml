@@ -22,8 +22,9 @@ jobs:
   publish:
     runs-on: [self-hosted, macmini]
     permissions:
-      # Required for OIDC: this is what npm trusts in place of a token, and
-      # what signs the provenance attestation.
+      # Required for OIDC: this is what npm trusts in place of a token.
+      # (Provenance attestation is not available — sigstore only accepts
+      # github-hosted runners, and this job runs on the self-hosted macmini.)
       id-token: write
       contents: read
     steps:
@@ -88,9 +89,9 @@ jobs:
             esac
           done
 
-      # Provenance is verified by the registry, not by `npm publish --dry-run`,
-      # so a package whose repository.url does not match the workflow's own
-      # repository fails only on the real upload. Check it here instead.
+      # A package whose repository.url does not match this repository used to
+      # fail only at the real upload, when provenance verification ran. The
+      # check stays as a sanity gate even though provenance is gone.
       - name: Verify each package declares this repository
         run: |
           expected="https://github.com/${{ github.repository }}"
@@ -122,5 +123,5 @@ jobs:
           fi
           for name in ns-kiro-core ns-omp-provider-kiro ns-dsh-llm-kiro; do
             echo "publishing $name"
-            npm publish ./tarballs/$name-*.tgz --provenance --access public $dry_run
+            npm publish ./tarballs/$name-*.tgz --access public $dry_run
           done
