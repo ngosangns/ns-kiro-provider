@@ -123,5 +123,5 @@ jobs:
           fi
           for name in ns-kiro-core ns-omp-provider-kiro ns-dsh-llm-kiro; do
             echo "publishing $name"
-            npm publish ./tarballs/$name-*.tgz --access public $dry_run
+            npm publish ./tarballs/$name-*.tgz --access public --no-provenance $dry_run
           done
