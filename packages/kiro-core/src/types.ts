@@ -131,6 +131,11 @@ export interface KiroUsage {
    */
   credits?: number;
   creditUnit?: string;
+  /**
+   * Set when {@link cacheRead} is an estimate from repeated prompt input rather
+   * than a wire counter — a host may render it differently or not at all.
+   */
+  cacheEstimated?: boolean;
   cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
 }
 
@@ -152,7 +157,18 @@ export type KiroStreamEvent =
   | { type: "tool_call_end"; index: number; id: string; name: string; arguments: Record<string, unknown> }
   | KiroResetEvent
   | { type: "usage"; usage: KiroUsage }
-  | { type: "done"; stopReason: "stop" | "toolUse" | "length" };
+  | {
+      type: "done";
+      stopReason: "stop" | "toolUse" | "length";
+      /**
+       * Terminal diagnostic for a turn that finished but produced less than the
+       * model sent — an exhausted empty/echo retry budget, or a tool call
+       * dropped for unparseable arguments. Worded as terminal on purpose so a
+       * consumer's retryable-error classifier cannot mistake it for a
+       * transient transport failure.
+       */
+      errorMessage?: string;
+    };
 
 /**
  * An internal retry discarded everything emitted so far. Hosts able to drop

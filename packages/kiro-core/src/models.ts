@@ -517,7 +517,10 @@ export function mapKiroCatalogModels(
     return {
       id,
       kiroModelId,
-      name: catalogName ?? existing?.name ?? humanizeModelId(id),
+      // Humanize the wire id, not the local one: `toLocalModelId` rewrites
+      // `5.1` as `5-1`, and a display name derived from it loses the dot —
+      // "Claude Fable 5 1" instead of "Claude Fable 5.1".
+      name: catalogName ?? existing?.name ?? humanizeModelId(kiroModelId),
       region,
       // Deliberately schema-only: when a schema exists the resolver returns
       // `deriveKiroEffort(schema)`, and when it does not the family-marker guess

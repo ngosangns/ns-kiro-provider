@@ -78,6 +78,11 @@ export class KiroBlockBuffer {
     return this.blocks.get(index)?.text ?? "";
   }
 
+  /** Kinds of the live blocks, in allocation order. */
+  kinds(): BlockKind[] {
+    return [...this.blocks.values()].map((block) => block.kind);
+  }
+
   /**
    * Rewrite one accumulated block before it is closed. Used by the recovery
    * passes that lift tool calls out of text and by echo-noise stripping, both

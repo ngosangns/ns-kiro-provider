@@ -5,15 +5,17 @@
     "remote": "upstream",
     "branch": "main"
   },
-  "syncedCommit": "1e4295b3dc8cc21a3da3eaead5af499dbdcd370c",
-  "syncedTag": "v0.10.2",
-  "syncedAt": "2026-09-18",
-  "_partialSyncNote": "syncedCommit trỏ tới 1e4295b3d ('fix: resolve ksk_ API key profiles via GetProfile'), commit đầu tiên sau tag v0.10.2 — chỉ commit này được port (targeted bugfix cho lỗi 403 ListAvailableProfiles của API key). syncedTag vẫn là v0.10.2 vì 1e4295b3d chưa nằm trong release tag nào của upstream (mục 'Unreleased' trong CHANGELOG). Còn 32 commit khác giữa v0.10.2 và upstream/main (0a023d524) CHƯA được đánh giá/port — chạy lại upstream-status.mjs để lấy danh sách đầy đủ.",
+  "syncedCommit": "dfb44189ad67723e56373ae3613bae69510f0375",
+  "syncedTag": "v0.12.0",
+  "syncedAt": "2026-09-23",
+  "_syncNote": "Đã review và port ngữ nghĩa toàn bộ 36 commit trong range 1e4295b3d..dfb44189a (release 0.11.0 + 0.12.0). Phần pi-specific (footer, pi-auth-store, PKCE login, loadKiroUsageTracking đọc ~/.pi/agent) giữ trong notPorted.",
   "pathMapping": {
     "src/bracket-tool-parser.ts": "packages/kiro-core/src/bracket-tool-parser.ts",
+    "src/cache-estimator.ts": "packages/kiro-core/src/cache-estimator.ts",
     "src/debug.ts": "packages/kiro-core/src/debug.ts",
     "src/effort.ts": "packages/kiro-core/src/effort.ts",
     "src/endpoints.ts": "packages/kiro-core/src/endpoints.ts",
+    "src/errors.ts": "packages/kiro-core/src/errors.ts",
     "src/event-parser.ts": "packages/kiro-core/src/event-parser.ts",
     "src/history-validator.ts": "packages/kiro-core/src/history-validator.ts",
     "src/history.ts": "packages/kiro-core/src/history.ts",
@@ -32,6 +34,7 @@
     "src/transform.ts": "packages/kiro-core/src/transform.ts",
     "src/truncation.ts": "packages/kiro-core/src/truncation.ts",
     "src/usage.ts": "packages/kiro-core/src/usage.ts",
+    "src/usage-tracking.ts": "packages/kiro-core/src/usage-tracking.ts",
     "src/login.ts": "packages/omp-provider-kiro/src/auth.ts",
     "test/*.test.ts": "packages/kiro-core/test/*.test.ts",
     "test/helpers/*": "packages/kiro-core/test/helpers/*",
@@ -40,6 +43,26 @@
     "test/registration.test.ts": "packages/omp-provider-kiro/test/packaging.test.ts"
   },
   "notPorted": [
+    {
+      "path": "src/footer.ts, src/footer-lifecycle.ts",
+      "reason": "Usage footer của pi-tui (PR #165). Phần protocol (meteringEvent -> credits, estimateKiroCreditCost, applyCacheEstimate) đã port sang kiro-core host-neutral; phần render footer đọc ~/.pi/agent không có chỗ tương ứng. Host muốn bật estimation truyền KiroUsageTracking qua KiroStreamRequest.usageTracking."
+    },
+    {
+      "path": "src/pi-auth-store.ts",
+      "reason": "Đọc/ghi ~/.pi/agent/auth.json của pi. Auth của repo này đi qua kiro-cli / Kiro IDE session + API key."
+    },
+    {
+      "path": "src/usage-tracking.ts (loadKiroUsageTracking)",
+      "reason": "Loader đọc ~/.pi/agent/settings.json. Bản port giữ resolveKiroUsageTracking(section) thuần — host resolve policy rồi truyền vào, core không đọc file settings của bất kỳ host nào."
+    },
+    {
+      "path": "src/index.ts (resolveProviderContext system messages)",
+      "reason": "Chèn system message vào transcript theo shape pi-ai mới (footer/usage). OMP pi-ai 18.2.7 chưa có shape tương ứng; không port cho tới khi host cần."
+    },
+    {
+      "path": "src/endpoints.ts (IDC_PROBE_REGIONS)",
+      "reason": "Danh sách region probe của PKCE login. Repo này không chạy PKCE; region runtime đã phủ bởi API_REGION_MAP + getKiroRegionFromProfileArn."
+    },
     {
       "path": "src/login-ui.ts",
       "reason": "Upstream dùng PKCE browser login qua pi-tui. Bản port không tự chạy browser flow: nó đọc lại session kiro-cli / Kiro IDE, còn API key thì nhận trực tiếp. Chỉ port khi thay đổi chạm tới primitive trong oauth.ts."
@@ -117,7 +140,7 @@
       "path": "packages/kiro-core/src/event-parser.ts, packages/kiro-core/src/stream.ts",
       "upstreamPath": "src/event-parser.ts, src/stream.ts",
       "since": "2026-09-06",
-      "what": "Frame `usage` đọc thêm cache token (nhiều spelling: cacheReadInputTokens / cache_read_input_tokens / ...), validate mọi token count phải là số hữu hạn không âm, và log frame nguyên văn qua debugLog('response.usageRaw') khi KIRO_DEBUG=1. KiroUsage có thêm cacheRead?/cacheWrite? optional.",
+      "what": "Frame `tokenUsage` (trong metadataEvent) đọc thêm cache token ở NHIỀU spelling (cacheReadInputTokens / cache_read_input_tokens / cacheReadTokens / cacheWriteInputTokens / cache_creation_input_tokens / cacheCreationInputTokens / cacheWriteTokens — upstream chỉ đọc 2 tên Smithy-modeled), validate mọi token count phải là số hữu hạn không âm, và log frame nguyên văn qua debugLog('response.usageRaw') khi KIRO_DEBUG=1. KiroUsage có thêm cacheRead?/cacheWrite? optional.",
       "why": "Schema `additionalModelRequestFieldsSchema` của Kiro đặt `additionalProperties: false` và chỉ cho phép thinking/output_config/max_tokens (Claude) hoặc reasoning (GPT) — không có đường nào gửi cache directive từ client. Đòn bẩy duy nhất còn lại là quan sát: trước thay đổi này provider vứt mọi tín hiệu cache và hardcode cacheRead/cacheWrite = 0, nên không ai biết Kiro có cache hay không. Optional (không phải 0) để phân biệt 'không cache' với 'service không nói gì'.",
       "risk": "Nếu upstream thêm xử lý cache theo cách khác, đối chiếu trước khi port đè. Test giữ hành vi: packages/kiro-core/test/event-parser.test.ts (nhóm cache count) và packages/kiro-core/test/stream.test.ts ('surfaces cache counts', 'leaves cache counts absent')."
     },
@@ -154,14 +177,6 @@
       "risk": "Không có; test này chỉ chặt hơn bản cũ."
     },
     {
-      "path": "packages/kiro-core/src/event-parser.ts, packages/kiro-core/src/types.ts, packages/kiro-core/src/response-assembler.ts",
-      "upstreamPath": "src/event-parser.ts",
-      "since": "2026-09-06",
-      "what": "Frame `usage` nhận thêm dạng billing: {unit:'credit', unitPlural:'credits', usage:<number>} -> KiroUsage.credits/creditUnit. Dạng object (inputTokens/outputTokens) vẫn giữ.",
-      "why": "Đo thật 2026-09-06 (claude-sonnet-5, us-east-1): Kiro KHÔNG gửi token count. Frame usage là bản ghi credit, và `usage` là NUMBER chứ không phải object — nên `u.inputTokens` luôn undefined. Đường token của provider chưa bao giờ chạy với Kiro thật: usage.input luôn đến từ contextUsagePercentage × contextWindow, usage.output luôn từ ước lượng tiktoken. Credit là con số chi phí thật và trước đây bị vứt hoàn toàn.",
-      "risk": "Nếu Kiro bổ sung token count dạng object, nhánh cũ vẫn xử lý. Test: packages/kiro-core/test/event-parser.test.ts, 'parses the credit billing frame Kiro really emits'."
-    },
-    {
       "path": "packages/kiro-core/src/stream.ts",
       "upstreamPath": "src/stream.ts",
       "since": "2026-09-06",
@@ -184,6 +199,30 @@
       "what": "getKiroCliModelRates() đọc `kiro-cli chat --list-models --format json` lấy rate_multiplier/rate_unit; mapKiroCatalogModels nhận thêm param `rates` (vẫn pure) và gắn vào KiroModelSpec.rateMultiplier/rateUnit; updateKiroModelsCache truyền rates vào.",
       "why": "Management catalog KHÔNG có thông tin chi phí, và Kiro không publish giá per-token — cost luôn là ZERO_COST. kiro-cli là nguồn duy nhất công bố trọng số tính tiền (0.05 qwen -> 2.4 gpt-5.6-sol). Hai nguồn bù nhau: management cho effort schema + maxOutputTokens, kiro-cli cho rate. Cố ý KHÔNG map rate vào `cost`: cost là USD/triệu token, rate là hệ số credit — nhét vào sẽ khiến host hiển thị '$2.2/1M tokens'.",
       "risk": "Phụ thuộc output format của binary ngoài. Mọi lỗi (thiếu kiro-cli, JSON hỏng, entry không hợp lệ) đều degrade về 'không biết rate' chứ không phá refresh catalog. Bootstrap list cố ý không hardcode rate: pricing dễ đổi, absent tốt hơn sai. Test: packages/kiro-core/test/kiro-cli-rates.test.ts và models.test.ts ('attaches billing weights')."
+    },
+    {
+      "path": "packages/kiro-core/src/models.ts (KIRO_MANAGEMENT_CACHE_PATH)",
+      "upstreamPath": "src/models.ts",
+      "since": "2026-09-23",
+      "what": "Giữ cache catalog ở ~/.ns-kiro-provider-models-cache.json; upstream 0.12.0 dời sang ~/.pi/agent/kiro-management-models-cache.json.",
+      "why": "Hai format cache khác nhau (bản port gom theo region trong một file versioned). Dùng chung path ~/.pi/agent sẽ khiến hai phía validate/ghi đè lẫn nhau và refetch liên tục.",
+      "risk": "Không đổi path khi port thay đổi models.ts của upstream. Nếu upstream đổi schema cache, đối chiếu KIRO_MANAGEMENT_CACHE_VERSION."
+    },
+    {
+      "path": "packages/kiro-core/src/types.ts (KiroStreamEvent done.errorMessage), packages/omp-provider-kiro/src/stream.ts, packages/dsh-llm-kiro/src/adapter.ts",
+      "upstreamPath": "src/stream.ts (AssistantMessage diagnostics)",
+      "since": "2026-09-23",
+      "what": "Diagnostic terminal (retry cạn cho empty/echo, tool call bị drop do args không parse) đi qua field `errorMessage` trên event `done` thay vì channel `AssistantMessage.diagnostics` của pi-ai. OMP map thẳng sang output.errorMessage; dsh nhét vào finish.replayState.response vì FinishReason không có field message cho reason thành công. KiroApiError throw trực tiếp từ generator (upstream encode vào stream event).",
+      "why": "Repo không dùng pi-ai diagnostics; `done` là event terminal duy nhất cả hai host đều đọc. wording giữ nguyên nguyên tắc upstream: không chứa pattern retryable (không số HTTP trần, tên tool mã hoá A-P/SHA-256).",
+      "risk": "Nếu upstream thêm diagnostic kind mới, map sang errorMessage hoặc event mới — đừng để nó chết lặng. Test: packages/kiro-core/test/stream.test.ts nhóm 'errorMessage'."
+    },
+    {
+      "path": "packages/kiro-core/src/stream.ts (usageTracking), packages/kiro-core/src/usage-tracking.ts, cache-estimator.ts",
+      "upstreamPath": "src/stream.ts, src/usage-tracking.ts, src/cache-estimator.ts, src/footer*.ts",
+      "since": "2026-09-23",
+      "what": "Estimate chỉ chạy khi host truyền KiroStreamRequest.usageTracking (opt-in, mặc định KIRO_USAGE_TRACKING_DISABLED). Không có loadKiroUsageTracking — host tự resolve settings rồi truyền resolveKiroUsageTracking(section). Upstream đọc ~/.pi/agent/settings.json trong extension.",
+      "why": "kiro-core host-neutral: không đọc file của host cụ thể. Cả OMP lẫn dsh hiện chưa truyền usageTracking nên estimation mặc định tắt — đúng ý upstream (opt-in).",
+      "risk": "Khi một host muốn bật, nó resolve section 'usageTracking' của chính nó qua resolveKiroUsageTracking rồi truyền vào request. Test: packages/kiro-core/test/usage-tracking.test.ts, cache-estimator.test.ts, stream.test.ts (nhóm estimate)."
     }
   ]
 }

@@ -3,12 +3,20 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { findJsonEnd } from "../src/bracket-tool-parser.js";
+import { resetCacheEstimatorForTests } from "../src/cache-estimator.js";
+import { KiroApiError } from "../src/errors.js";
 import type { KiroModel } from "../src/models.js";
 import { capacityRetryConfig } from "../src/retry.js";
 import { type KiroStreamRequest, resetProfileArnCache, streamKiro } from "../src/stream.js";
 import { EMPTY_CONTENT_PLACEHOLDER } from "../src/transform.js";
 import type { KiroMessage, KiroStreamEvent } from "../src/types.js";
-import { concatMessages, encodeEventMessage } from "./helpers/event-stream.js";
+import { KIRO_USAGE_TRACKING_DISABLED } from "../src/usage-tracking.js";
+import {
+  concatMessages,
+  encodeEventMessage,
+  encodeExceptionMessage,
+  encodeRawExceptionMessage,
+} from "./helpers/event-stream.js";
 import { RECORD_279_COMMAND, RECORD_279_SUMMARY, RECORD_279_TEXT } from "./helpers/invoke-fixture.js";
 
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -58,7 +66,11 @@ function encodeBody(body: string): Uint8Array {
 }
 
 function makeOkResponse(body: string): Response {
-  const frames = encodeBody(body);
+  return makeFramesResponse(encodeBody(body));
+}
+
+/** A response built from already-encoded frames, for exception members. */
+function makeFramesResponse(frames: Uint8Array): Response {
   return {
     ok: true,
     body: {
@@ -171,6 +183,7 @@ const TEXT_ONLY = '{"content":"Hi"}{"contextUsagePercentage":10}';
 
 beforeEach(() => {
   resetProfileArnCache(true);
+  resetCacheEstimatorForTests();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -424,7 +437,13 @@ describe("streamKiro — tool calls", () => {
     const events = await collect(streamKiro(makeRequest()));
 
     expect(events.some((e) => e.type === "tool_call_end")).toBe(false);
-    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
+    const done = events.find((e) => e.type === "done");
+    expect(done).toMatchObject({ stopReason: "stop" });
+    // The call the model made is gone; the terminal diagnostic is the only
+    // channel that can say so. Its wording must stay terminal — no bare
+    // retryable HTTP status digits a consumer's classifier could match.
+    expect(done).toMatchObject({ errorMessage: expect.stringContaining("unparseable arguments") });
+    expect((done as { errorMessage?: string }).errorMessage).not.toMatch(/\b(429|500|502|503|504)\b/);
     expect(warn).toHaveBeenCalled();
   });
 });
@@ -519,7 +538,9 @@ describe("streamKiro — stop reason and usage", () => {
 
   it("prefers the wire usage frame and keeps totalTokens consistent", async () => {
     stubFetch(
-      makeOkResponse('{"content":"Hi"}{"usage":{"inputTokens":120,"outputTokens":7}}{"contextUsagePercentage":10}'),
+      makeOkResponse(
+        '{"content":"Hi"}{"tokenUsage":{"uncachedInputTokens":120,"outputTokens":7}}{"contextUsagePercentage":10}',
+      ),
     );
     const events = await collect(streamKiro(makeRequest()));
 
@@ -581,7 +602,7 @@ describe("streamKiro — stop reason and usage", () => {
   });
 
   it("reads a real ReadableStream body, taking its reader exactly once", async () => {
-    stubFetch(makeRealBodyResponse('{"content":"Hi"}{"usage":{"inputTokens":9,"outputTokens":2}}'));
+    stubFetch(makeRealBodyResponse('{"content":"Hi"}{"tokenUsage":{"uncachedInputTokens":9,"outputTokens":2}}'));
     const events = await collect(streamKiro(makeRequest()));
 
     expect(events.find((e) => e.type === "text_end")).toMatchObject({ text: "Hi" });
@@ -591,7 +612,7 @@ describe("streamKiro — stop reason and usage", () => {
   it("surfaces cache counts the usage frame reports", async () => {
     stubFetch(
       makeOkResponse(
-        '{"content":"Hi"}{"usage":{"inputTokens":1000,"outputTokens":7,"cacheReadInputTokens":900,"cacheWriteInputTokens":120}}{"contextUsagePercentage":10}',
+        '{"content":"Hi"}{"tokenUsage":{"uncachedInputTokens":1000,"outputTokens":7,"cacheReadInputTokens":900,"cacheWriteInputTokens":120}}{"contextUsagePercentage":10}',
       ),
     );
     const events = await collect(streamKiro(makeRequest()));
@@ -604,7 +625,9 @@ describe("streamKiro — stop reason and usage", () => {
 
   it("leaves cache counts absent when the usage frame reports none", async () => {
     stubFetch(
-      makeOkResponse('{"content":"Hi"}{"usage":{"inputTokens":120,"outputTokens":7}}{"contextUsagePercentage":10}'),
+      makeOkResponse(
+        '{"content":"Hi"}{"tokenUsage":{"uncachedInputTokens":120,"outputTokens":7}}{"contextUsagePercentage":10}',
+      ),
     );
     const events = await collect(streamKiro(makeRequest()));
 
@@ -634,6 +657,120 @@ describe("streamKiro — stop reason and usage", () => {
       .usage;
     expect(usage.contextPercent).toBe(25);
     expect(usage.input).toBe(50000);
+  });
+
+  it("prefers the wire totalTokens over the sum of its parts", async () => {
+    // `TokenUsage.uncachedInputTokens` excludes cache reads, so the wire total
+    // is the only figure that reflects them. Recomputing from components
+    // under-reports whenever a component is omitted.
+    stubFetch(
+      makeOkResponse(
+        '{"content":"Hi"}{"tokenUsage":{"uncachedInputTokens":200,"outputTokens":50,"totalTokens":50250,"cacheReadInputTokens":50000}}',
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { totalTokens: number } }).usage;
+    expect(usage.totalTokens).toBe(50250);
+  });
+
+  it("merges metadataEvent frames so a later stopReason frame cannot erase token counts", async () => {
+    // Every MetadataEvent field is optional; tokenUsage and stopReason may
+    // arrive in separate frames.
+    stubFetch(
+      makeOkResponse(
+        '{"content":"Hi"}' +
+          '{"tokenUsage":{"uncachedInputTokens":500,"outputTokens":200,"totalTokens":700}}' +
+          '{"stopReason":"END_TURN"}{"contextUsagePercentage":10}',
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (
+      events.find((e) => e.type === "usage") as {
+        usage: { input: number; output: number; totalTokens: number };
+      }
+    ).usage;
+    expect(usage.input).toBe(500);
+    expect(usage.output).toBe(200);
+    expect(usage.totalTokens).toBe(700);
+    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
+  });
+
+  it("surfaces a meteringEvent's credit count on the usage event", async () => {
+    stubFetch(
+      makeFramesResponse(
+        concatMessages(
+          encodeEventMessage({ content: "Hi" }),
+          encodeEventMessage({ usage: 0.0658, unit: "credit", unitPlural: "credits" }),
+          encodeEventMessage({ contextUsagePercentage: 10 }),
+        ),
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { credits?: number; creditUnit?: string } })
+      .usage;
+    expect(usage.credits).toBe(0.0658);
+    expect(usage.creditUnit).toBe("credit");
+  });
+
+  it("estimates a dollar value from the metering frame only when opted in", async () => {
+    stubFetch(
+      makeFramesResponse(
+        concatMessages(
+          encodeEventMessage({ content: "Hi" }),
+          encodeEventMessage({ usage: 2, unit: "credit", unitPlural: "credits" }),
+          encodeEventMessage({ contextUsagePercentage: 10 }),
+        ),
+      ),
+    );
+    const events = await collect(
+      streamKiro(
+        makeRequest({
+          usageTracking: { ...KIRO_USAGE_TRACKING_DISABLED, estimateDollarValue: true, usdPerCredit: 0.04 },
+        }),
+      ),
+    );
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { cost: { total: number } } }).usage;
+    expect(usage.cost.total).toBeCloseTo(0.08);
+  });
+
+  it("leaves the dollar cost untouched when tracking is off", async () => {
+    stubFetch(
+      makeFramesResponse(
+        concatMessages(
+          encodeEventMessage({ content: "Hi" }),
+          encodeEventMessage({ usage: 2, unit: "credit", unitPlural: "credits" }),
+          encodeEventMessage({ contextUsagePercentage: 10 }),
+        ),
+      ),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    const usage = (events.find((e) => e.type === "usage") as { usage: { cost: { total: number } } }).usage;
+    expect(usage.cost.total).toBe(0);
+  });
+
+  it("estimates a repeated prompt as a cache read on the second turn of a session", async () => {
+    stubFetch(
+      makeOkResponse('{"content":"one"}{"tokenUsage":{"uncachedInputTokens":500,"outputTokens":100}}'),
+      makeOkResponse('{"content":"two"}{"tokenUsage":{"uncachedInputTokens":500,"outputTokens":50}}'),
+    );
+    const tracking = { ...KIRO_USAGE_TRACKING_DISABLED, estimateCacheUsage: true };
+
+    await collect(streamKiro(makeRequest({ sessionId: "sess-1", usageTracking: tracking })));
+    const events = await collect(streamKiro(makeRequest({ sessionId: "sess-1", usageTracking: tracking })));
+
+    const usage = (
+      events.find((e) => e.type === "usage") as {
+        usage: { input: number; cacheRead?: number; cacheEstimated?: boolean };
+      }
+    ).usage;
+    expect(usage.cacheRead).toBe(500);
+    expect(usage.cacheEstimated).toBe(true);
+    expect(usage.input).toBe(0);
   });
 });
 
@@ -692,6 +829,32 @@ describe("streamKiro — degenerate responses", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(events.find((e) => e.type === "text_end")).toMatchObject({ text: "Second time" });
     expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
+  });
+
+  it("attaches a terminal errorMessage once empty responses exhaust the budget", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    // maxRetries = 3, so the turn ends after four empty attempts.
+    stubFetch(...Array.from({ length: 4 }, () => makeOkResponse('{"contextUsagePercentage":10}')));
+    const events = await collectThroughBackoff(streamKiro(makeRequest()));
+
+    const done = events.find((e) => e.type === "done") as { errorMessage?: string };
+    expect(done.errorMessage).toMatch(/no text and no tool calls/);
+    expect(done.errorMessage).not.toMatch(/\b(429|500|502|503|504)\b/);
+  });
+
+  it("attaches a terminal errorMessage when the echo loop persists", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    stubFetch(
+      ...Array.from({ length: 4 }, () => makeOkResponse('{"content":"Continue"}{"contextUsagePercentage":10}')),
+    );
+    const events = await collectThroughBackoff(streamKiro(makeRequest({ canDiscardEmittedBlocks: true })));
+
+    const done = events.find((e) => e.type === "done") as { errorMessage?: string };
+    expect(done.errorMessage).toMatch(/echoed its own continuation prompt/);
+    expect(done.errorMessage).not.toMatch(/\b(429|500|502|503|504)\b/);
+    expect(events.find((e) => e.type === "text_end")).toMatchObject({ text: "" });
   });
 });
 
@@ -772,5 +935,99 @@ describe("streamKiro — transport errors", () => {
 
     await expect(collect(streamKiro(makeRequest({ signal: controller.signal })))).rejects.toThrow("caller went away");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("streamKiro — exception frames and typed errors", () => {
+  it("retries a mid-stream exception frame and announces the discard", async () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFetch(
+      makeFramesResponse(
+        concatMessages(
+          encodeEventMessage({ content: "partial " }),
+          encodeExceptionMessage("throttlingError", {
+            message: "Too many requests",
+            reason: "INSUFFICIENT_MODEL_CAPACITY",
+            retryAfterMilliseconds: 4500,
+          }),
+        ),
+      ),
+      makeOkResponse(TEXT_ONLY),
+    );
+    const events = await collectThroughBackoff(streamKiro(makeRequest({ canDiscardEmittedBlocks: true })));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The abandoned attempt's partial text is retracted via the reset marker.
+    expect(events.some((e) => e.type === "reset")).toBe(true);
+    expect(events.find((e) => e.type === "text_end")).toMatchObject({ text: "Hi" });
+    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
+  });
+
+  it("surfaces the exception class after the retry budget is spent", async () => {
+    vi.useFakeTimers();
+    stubFetch(
+      ...Array.from({ length: 4 }, () =>
+        makeFramesResponse(encodeExceptionMessage("throttlingError", { message: "slow down" })),
+      ),
+    );
+    await expect(collectThroughBackoff(streamKiro(makeRequest()))).rejects.toThrow(/ThrottlingException/);
+  });
+
+  it("accepts the exception class name as the :exception-type token", async () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFetch(
+      makeFramesResponse(encodeRawExceptionMessage("ServiceUnavailableException", { message: "down" })),
+      makeOkResponse(TEXT_ONLY),
+    );
+    const events = await collectThroughBackoff(streamKiro(makeRequest()));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
+  });
+
+  it("throws a KiroApiError carrying status and reasonCode on a terminal HTTP failure", async () => {
+    stubFetch(makeErrorResponse(429, '{"reason":"MONTHLY_REQUEST_COUNT"}', "Too Many Requests"));
+    const error = await collect(streamKiro(makeRequest())).catch((e: Error) => e);
+
+    expect(error).toBeInstanceOf(KiroApiError);
+    const apiError = error as KiroApiError;
+    expect(apiError.status).toBe(429);
+    expect(apiError.reasonCode).toBe("MONTHLY_REQUEST_COUNT");
+    expect(apiError.providerAttempts).toEqual({ credentialRefresh: 0, capacity: 0 });
+  });
+});
+
+describe("streamKiro — endpoint selection", () => {
+  it("routes the runtime call to the profile ARN's region, not the model's", async () => {
+    const fetchMock = stubFetch(makeOkResponse(TEXT_ONLY));
+    // ListAvailableProfiles probes across regions, so an SSO login in one
+    // region can legitimately resolve a profile owned by another.
+    const profileArn = "arn:aws:codewhisperer:eu-central-1:111111111111:profile/in-eu";
+    await collect(streamKiro(makeRequest({ model: makeModel({ profileArn }) })));
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("runtime.eu-central-1.kiro.dev");
+  });
+
+  it("retries when no first token arrives within the model's deadline", async () => {
+    vi.useFakeTimers();
+    const hanging = {
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: () => new Promise(() => {}),
+          releaseLock: () => {},
+          cancel: async () => {},
+        }),
+        cancel: async () => {},
+      },
+    } as unknown as Response;
+    const fetchMock = stubFetch(hanging, makeOkResponse(TEXT_ONLY));
+    const events = await collectThroughBackoff(
+      streamKiro(makeRequest({ model: makeModel({ firstTokenTimeout: 50 }) })),
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "stop" });
   });
 });

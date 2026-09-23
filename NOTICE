@@ -8,7 +8,7 @@ licensed under the MIT License.
 `packages/kiro-core` is a port of that project's Kiro protocol layer — endpoint
 resolution, the model catalog and its cache, kiro-cli credential reuse and token
 refresh, AWS event-stream parsing, thinking and tool-call parsing, history
-validation and repair, and retry classification. The port replaces the pi-ai
-message and event types with a host-neutral vocabulary so the same protocol code
-can serve both OMP and the DeepSeek Harness; the protocol behaviour itself is
-upstream's.
+validation and repair, retry classification and typed API errors, and opt-in
+usage/cost estimation. The port replaces the pi-ai message and event types with
+a host-neutral vocabulary so the same protocol code can serve both OMP and the
+DeepSeek Harness; the protocol behaviour itself is upstream's.

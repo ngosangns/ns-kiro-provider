@@ -2,6 +2,7 @@
 
 export { KiroBlockBuffer } from "./blocks.js";
 export { parseBracketToolCalls } from "./bracket-tool-parser.js";
+export { applyCacheEstimate, resetCacheEstimatorForTests } from "./cache-estimator.js";
 export { calculateKiroCost } from "./cost.js";
 export { debugEnabled, debugLog, formatSafeError, redactSensitiveText } from "./debug.js";
 export {
@@ -18,10 +19,30 @@ export {
 export {
   getKiroEndpoints,
   getKiroRegionFromEndpoint,
+  getKiroRegionFromProfileArn,
   type KiroEndpoints,
   resolveApiRegion,
 } from "./endpoints.js";
-export { type KiroWireEvent, type KiroWireUsage, parseKiroEvent } from "./event-parser.js";
+export {
+  extractKiroReasonCode,
+  KiroApiError,
+  type KiroProviderAttempts,
+  parseRetryAfterMs,
+} from "./errors.js";
+export {
+  isKiroEventKey,
+  KIRO_ERROR_MEMBERS,
+  KIRO_EVENT_KEYS,
+  type KiroErrorData,
+  type KiroErrorKind,
+  type KiroEventKey,
+  type KiroWireEvent,
+  type KiroWireUsage,
+  lookupKiroErrorMember,
+  parseKiroEvent,
+  parseKiroEventByShape,
+  parseKiroExceptionFrame,
+} from "./event-parser.js";
 export {
   isKiroToolStructureRule,
   KIRO_TOOL_STRUCTURE_RULES,
@@ -142,3 +163,11 @@ export {
 export { TRUNCATION_NOTICE, wasPreviousResponseTruncated } from "./truncation.js";
 export * from "./types.js";
 export { fetchKiroUsage, type KiroProviderUsage, type KiroProviderUsageBucket } from "./usage.js";
+export {
+  DEFAULT_ESTIMATED_CACHE_TIMEOUT_MS,
+  DEFAULT_USD_PER_CREDIT,
+  estimateKiroCreditCost,
+  KIRO_USAGE_TRACKING_DISABLED,
+  type KiroUsageTracking,
+  resolveKiroUsageTracking,
+} from "./usage-tracking.js";

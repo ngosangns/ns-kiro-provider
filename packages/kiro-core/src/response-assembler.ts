@@ -32,19 +32,35 @@ export interface KiroAttemptSummary {
   isEchoLoop: boolean;
   /** No text and no tool calls: a 200 that said nothing. */
   isEmpty: boolean;
+  /**
+   * Resolved as soon as the attempt's inputs are final so an exhaustion
+   * diagnostic can report the value actually assigned.
+   */
+  stopReason: "stop" | "toolUse" | "length";
+  /**
+   * Names of tool calls `emitToolCall` refused because their arguments would
+   * not parse. Per-attempt, like `emittedToolCalls`: a retry must not inherit
+   * a discarded attempt's drops.
+   */
+  droppedToolCalls: unknown[];
 }
 
 export interface KiroCompletedResponse {
   stopReason: "stop" | "toolUse" | "length";
   usage: KiroUsage;
+  /** Wire usage as received, for callers running usage estimates. */
+  wireUsage: KiroWireUsage | null;
+  /** The turn's credit metering frame, when Kiro sent one. */
+  metering: { credits?: number; unit?: string; unitPlural?: string } | null;
 }
 
 /**
  * Accumulates one response.
  *
  * Block indexes are monotonic across the whole call, including across an
- * internal retry, so the buffer and the usage totals outlive a single attempt
- * while everything else is reset by {@link beginAttempt}.
+ * internal retry, so the buffer outlives a single attempt while everything
+ * else — including the usage figures — is reset by {@link beginAttempt}:
+ * a discarded attempt must not bill the turn that replaced it.
  */
 export class KiroResponseAssembler {
   private readonly pending: KiroStreamEvent[] = [];
@@ -59,6 +75,7 @@ export class KiroResponseAssembler {
   private totalContent = "";
   private lastContentData = "";
   private usageEvent: KiroWireUsage | null = null;
+  private meteringEvent: { credits?: number; unit?: string; unitPlural?: string } | null = null;
   private receivedContextUsage = false;
   private thinkingParser: ThinkingTagParser | null = null;
   private nativeThinkingBlockIndex: number | null = null;
@@ -66,18 +83,21 @@ export class KiroResponseAssembler {
   private textBlockIndex: number | null = null;
   private emittedToolCalls = 0;
   private sawAnyToolCalls = false;
+  private droppedToolCalls: unknown[] = [];
   private currentToolCall: KiroToolCallState | null = null;
+  private stopReason: "stop" | "toolUse" | "length" = "stop";
 
   constructor(
     private readonly model: KiroModel,
     private readonly thinkingEnabled: boolean,
   ) {}
 
-  /** Clear per-attempt state. Block indexes and accumulated usage are kept. */
+  /** Clear per-attempt state. Only block indexes are kept. */
   beginAttempt(): void {
     this.totalContent = "";
     this.lastContentData = "";
     this.usageEvent = null;
+    this.meteringEvent = null;
     this.receivedContextUsage = false;
     this.thinkingParser = this.thinkingEnabled ? new ThinkingTagParser(this.blocks) : null;
     this.nativeThinkingBlockIndex = null;
@@ -85,7 +105,23 @@ export class KiroResponseAssembler {
     this.textBlockIndex = null;
     this.emittedToolCalls = 0;
     this.sawAnyToolCalls = false;
+    this.droppedToolCalls = [];
     this.currentToolCall = null;
+    // Every wire-derived usage figure lives on `usage`, which outlives the
+    // retry loop, so an abandoned attempt's accounting would otherwise be
+    // billed to the turn that replaced it.
+    this.usage.input = 0;
+    this.usage.output = 0;
+    this.usage.totalTokens = 0;
+    this.usage.cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+    // Optional fields stay absent rather than 0: absent means "the service did
+    // not report it", which a retried turn must not overwrite with a stale or
+    // invented figure.
+    delete this.usage.cacheRead;
+    delete this.usage.cacheWrite;
+    delete this.usage.contextPercent;
+    delete this.usage.credits;
+    delete this.usage.creditUnit;
   }
 
   /** Hand over the events buffered so far. */
@@ -158,11 +194,19 @@ export class KiroResponseAssembler {
         break;
       }
       case "usage": {
-        this.usageEvent = event.data;
+        // Every metadataEvent field is optional, so the service may split
+        // tokenUsage and stopReason/stopDetails across frames. Merge so a
+        // later partial frame cannot erase counts already received.
+        this.usageEvent = { ...(this.usageEvent ?? {}), ...event.data };
         // The parsed event keeps only the fields this package understands.
         // Log the frame verbatim so a field Kiro adds — cache counters above
         // all — is visible without having to guess its name first.
         if (debugEnabled()) debugLog("response.usageRaw", payload);
+        break;
+      }
+      case "metering": {
+        this.meteringEvent = event.data;
+        if (debugEnabled()) debugLog("stream.metering", [event.data]);
         break;
       }
       // followupPrompt events are intentionally ignored
@@ -174,7 +218,10 @@ export class KiroResponseAssembler {
    * text-dialect recovery and echo-stripping passes.
    */
   endTurn(): KiroAttemptSummary {
-    if (this.currentToolCall && this.emitToolCall(this.currentToolCall)) this.emittedToolCalls++;
+    if (this.currentToolCall) {
+      if (this.emitToolCall(this.currentToolCall)) this.emittedToolCalls++;
+      else this.droppedToolCalls.push(this.currentToolCall.name);
+    }
     this.currentToolCall = null;
     this.endNativeThinking();
     if (this.thinkingParser) {
@@ -182,11 +229,34 @@ export class KiroResponseAssembler {
       this.textBlockIndex = this.thinkingParser.getTextBlockIndex();
     }
 
+    // Deliberately still gated on `sawAnyToolCalls`, so it does NOT run when a
+    // native call arrived and was dropped for unparseable arguments. Widening it
+    // to `emittedToolCalls === 0` would enable text recovery on exactly the path
+    // where `KiroModel.recoverTextToolCalls === false` says not to (Claude). The
+    // drop is reported instead via `droppedToolCalls`.
     this.recoverTextToolCalls();
     this.stripEchoNoise();
 
     const responseText = this.textBlockIndex === null ? "" : this.blocks.getText(this.textBlockIndex);
     const hasText = responseText.length > 0;
+    // Resolved here — before the caller's retry-exhaustion warnings — so those
+    // diagnostics can report the value actually assigned. It reads only
+    // `receivedContextUsage` and `emittedToolCalls`, both final at this point.
+    //
+    // Use `emittedToolCalls`, not the count seen on the wire: a turn whose calls
+    // were all dropped for unparseable input must not report `toolUse`, because
+    // an empty turn with a tool-use stop stalls an agent loop waiting for
+    // results that will never arrive.
+    //
+    // `length` is inferred, not reported: Kiro sends no stop reason, so a turn
+    // that produced no tool call and never carried a contextUsage frame is
+    // treated as cut short.
+    this.stopReason =
+      !this.receivedContextUsage && this.emittedToolCalls === 0
+        ? "length"
+        : this.emittedToolCalls > 0
+          ? "toolUse"
+          : "stop";
     return {
       responseText,
       hasText,
@@ -194,12 +264,19 @@ export class KiroResponseAssembler {
       emittedToolCalls: this.emittedToolCalls,
       isEchoLoop: hasText && !this.sawAnyToolCalls && ECHO_NOISE_PATTERN.test(responseText),
       isEmpty: !hasText && !this.sawAnyToolCalls,
+      stopReason: this.stopReason,
+      droppedToolCalls: this.droppedToolCalls,
     };
   }
 
   /** Drop an echo the caller decided not to retry, so it is not read as a continuation signal. */
   stripEcho(): void {
     if (this.textBlockIndex !== null) this.blocks.setText(this.textBlockIndex, "");
+  }
+
+  /** Kinds of the blocks this attempt produced, for the exhaustion diagnostic. */
+  contentKinds(): string[] {
+    return this.blocks.kinds();
   }
 
   /** Close the text block and settle usage and the stop reason. */
@@ -211,40 +288,44 @@ export class KiroResponseAssembler {
     // tiktoken estimate over everything the assistant emitted — text plus
     // tool-call input JSON. Otherwise tool-call-only turns report 0 output
     // tokens and break consumers that watch it.
+    // `KiroWireUsage.inputTokens` is `TokenUsage.uncachedInputTokens` — the
+    // input billed at full rate, NOT total input — with the cache counts as
+    // siblings, so the cache counts must land whenever `input` is taken from
+    // the wire; otherwise a cached turn reports a fraction of its real input.
     if (this.usageEvent?.inputTokens !== undefined) this.usage.input = this.usageEvent.inputTokens;
     this.usage.output = this.usageEvent?.outputTokens ?? countTokens(this.totalContent);
-    this.usage.totalTokens = this.usage.input + this.usage.output;
+    // `TokenUsage.totalTokens` is required on the wire while the cache counts
+    // are optional, so the service's own total is the authoritative figure —
+    // recomputing from components silently under-reports whenever a component
+    // is omitted. Prefer it and fall back to the sum.
+    this.usage.totalTokens =
+      this.usageEvent?.totalTokens ??
+      this.usage.input +
+        (this.usageEvent?.cacheReadInputTokens ?? 0) +
+        (this.usageEvent?.cacheWriteInputTokens ?? 0) +
+        this.usage.output;
     // Only set when reported: leaving these absent is what tells a host that
     // Kiro said nothing about caching, rather than that nothing was cached.
-    if (this.usageEvent?.cacheReadTokens !== undefined) this.usage.cacheRead = this.usageEvent.cacheReadTokens;
-    if (this.usageEvent?.cacheWriteTokens !== undefined) this.usage.cacheWrite = this.usageEvent.cacheWriteTokens;
-    if (this.usageEvent?.credits !== undefined) this.usage.credits = this.usageEvent.credits;
-    if (this.usageEvent?.creditUnit !== undefined) this.usage.creditUnit = this.usageEvent.creditUnit;
+    if (this.usageEvent?.cacheReadInputTokens !== undefined)
+      this.usage.cacheRead = this.usageEvent.cacheReadInputTokens;
+    if (this.usageEvent?.cacheWriteInputTokens !== undefined)
+      this.usage.cacheWrite = this.usageEvent.cacheWriteInputTokens;
+    // The metering frame is the only usage figure Kiro actually sends: a
+    // credit count, not tokens.
+    if (this.meteringEvent?.credits !== undefined) this.usage.credits = this.meteringEvent.credits;
+    if (this.meteringEvent?.unit !== undefined) this.usage.creditUnit = this.meteringEvent.unit;
     this.usage.cost = calculateKiroCost(this.model.cost, this.usage);
 
-    // Use `emittedToolCalls`, not the count seen on the wire: a turn whose calls
-    // were all dropped for unparseable input must not report `toolUse`, because
-    // an empty turn with a tool-use stop stalls an agent loop waiting for
-    // results that will never arrive.
+    const stopReason = this.stopReason;
     //
-    // `length` is inferred, not reported: Kiro sends no stop reason, so a turn
-    // that produced no tool call and never carried a contextUsage frame is
-    // treated as cut short.
-    //
-    // That rests on contextUsage closing every complete response. Checked
-    // 2026-09-06 across a short reply, a ~5000-character one, a tool-call turn,
-    // a model with no effort schema (claude-haiku-4.5) and a non-Claude model
-    // (glm-5): the frame arrived in all five, so its absence really does mark an
-    // abnormal turn. `response.done` logs `receivedContextUsage` in case a later
-    // Kiro stops sending it — a false `length` is read by hosts as truncation
-    // and prepends TRUNCATION_NOTICE, asking the model to continue work it
-    // already finished.
-    const stopReason =
-      !this.receivedContextUsage && this.emittedToolCalls === 0
-        ? "length"
-        : this.emittedToolCalls > 0
-          ? "toolUse"
-          : "stop";
+    // The `length` heuristic rests on contextUsage closing every complete
+    // response. Checked 2026-09-06 across a short reply, a ~5000-character one,
+    // a tool-call turn, a model with no effort schema (claude-haiku-4.5) and a
+    // non-Claude model (glm-5): the frame arrived in all five, so its absence
+    // really does mark an abnormal turn. `response.done` logs
+    // `receivedContextUsage` in case a later Kiro stops sending it — a false
+    // `length` is read by hosts as truncation and prepends TRUNCATION_NOTICE,
+    // asking the model to continue work it already finished.
 
     debugLog("response.done", {
       stopReason,
@@ -255,7 +336,12 @@ export class KiroResponseAssembler {
       usage: this.usage,
     });
 
-    return { stopReason, usage: this.usage };
+    return {
+      stopReason,
+      usage: this.usage,
+      wireUsage: this.usageEvent,
+      metering: this.meteringEvent,
+    };
   }
 
   private ensureNativeThinkingBlock(): number {
@@ -280,6 +366,10 @@ export class KiroResponseAssembler {
     try {
       args = JSON.parse(state.input) as Record<string, unknown>;
     } catch (e) {
+      // Returning false drops the call: nothing is emitted for it, so the call
+      // the model made never reaches the agent. Callers record the name in
+      // `droppedToolCalls` so the turn can carry a diagnostic about it — a
+      // console warning is invisible to whoever reads the transcript.
       console.warn(
         `[kiro-core] Failed to parse tool input for "${state.name}" (toolUseId: ${state.toolUseId}): ${formatSafeError(e)}. Raw input (${state.input.length} chars): ${redactSensitiveText(state.input.substring(0, 200))}`,
       );
@@ -295,6 +385,7 @@ export class KiroResponseAssembler {
   private flushToolCall(): void {
     if (!this.currentToolCall) return;
     if (this.emitToolCall(this.currentToolCall)) this.emittedToolCalls++;
+    else this.droppedToolCalls.push(this.currentToolCall.name);
     this.currentToolCall = null;
   }
 
@@ -337,6 +428,16 @@ export class KiroResponseAssembler {
     for (const call of recovered) {
       if (this.emitToolCall({ toolUseId: call.toolUseId, name: call.name, input: JSON.stringify(call.arguments) })) {
         this.emittedToolCalls++;
+      } else {
+        // Unreachable as written, and kept deliberately. Both dialects hand
+        // over an in-memory object — bracket-tool-parser's is itself a
+        // successful `JSON.parse` result, invoke-tool-parser's is a record of
+        // raw parameter strings — so `JSON.stringify` of either always
+        // round-trips and `emitToolCall`'s only `false` return, a
+        // `JSON.parse` throw, cannot fire here. It stays so that a future
+        // parser change passing raw text through cannot silently reintroduce
+        // the very dropped-call blindness this change exists to remove.
+        this.droppedToolCalls.push(call.name);
       }
     }
   }

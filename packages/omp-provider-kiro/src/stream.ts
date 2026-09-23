@@ -233,10 +233,25 @@ export function streamKiroForOmp(
             if (event.usage.contextPercent !== undefined) {
               (output.usage as unknown as Record<string, unknown>).contextPercent = event.usage.contextPercent;
             }
+            // pi-ai's Usage has no credit/estimate fields; carry them through
+            // so a consumer that knows to look still sees the metering frame.
+            if (event.usage.credits !== undefined) {
+              (output.usage as unknown as Record<string, unknown>).credits = event.usage.credits;
+            }
+            if (event.usage.creditUnit !== undefined) {
+              (output.usage as unknown as Record<string, unknown>).creditUnit = event.usage.creditUnit;
+            }
+            if (event.usage.cacheEstimated !== undefined) {
+              (output.usage as unknown as Record<string, unknown>).cacheEstimated = event.usage.cacheEstimated;
+            }
             break;
           }
           case "done":
             output.stopReason = event.stopReason;
+            // A terminal diagnostic for a turn that finished but produced less
+            // than the model sent — written so OMP surfaces a silent turn as a
+            // failure instead of completing quietly.
+            if (event.errorMessage) output.errorMessage = event.errorMessage;
             stream.push({ type: "done", reason: event.stopReason, message: output });
             break;
         }

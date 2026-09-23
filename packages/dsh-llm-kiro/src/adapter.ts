@@ -196,6 +196,7 @@ export class KiroAdapter extends LlmAdapter {
             usage: {
               inputTokens: event.usage.input,
               outputTokens: event.usage.output,
+              totalTokens: event.usage.totalTokens,
               // Optional on both sides, so an unreported count stays absent
               // instead of being reported as a cache miss.
               ...(event.usage.cacheRead !== undefined ? { cacheReadTokens: event.usage.cacheRead } : {}),
@@ -212,10 +213,15 @@ export class KiroAdapter extends LlmAdapter {
                 : event.stopReason === "length"
                   ? { kind: "max-tokens" }
                   : { kind: "stop" },
+            // The finish union carries no message field for a successful
+            // reason, so a terminal diagnostic rides the replay envelope —
+            // the harness stores it on the assembled message's model source.
+            ...(event.errorMessage ? { replayState: { response: { errorMessage: event.errorMessage } } } : {}),
           };
           break;
-        // `start` needs no chunk, and `reset` cannot happen: this adapter tells
-        // the core it can never discard a delivered block.
+        // `start` needs no chunk. `reset` can arrive on a mid-stream-error
+        // retry; this adapter cannot un-deliver a block, so it ignores the
+        // marker and lets the retried attempt continue on fresh indexes.
       }
     }
 

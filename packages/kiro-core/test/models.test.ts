@@ -239,6 +239,14 @@ describe("Feature 2: Model Definitions", () => {
       ).toThrow("invalid request-fields schema");
     });
 
+    it("keeps the version dot in a humanized display name", () => {
+      // `toLocalModelId` rewrites `5.1` as `5-1`, so a display name derived
+      // from the local id would read "Claude Fable 5 1".
+      const [fable] = mapKiroCatalogModels([{ modelId: "claude-fable-5.1" }], TEST_REGION);
+      expect(fable.id).toBe("claude-fable-5-1");
+      expect(fable.name).toBe("Claude Fable 5.1");
+    });
+
     it("preserves the exact service ID for request-time model resolution", () => {
       const dynamicModel = mapped.find((model) => model.id === "openai-gpt-5-6");
       expect(dynamicModel).toBeDefined();
