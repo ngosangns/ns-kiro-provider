@@ -20,7 +20,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macmini]
     permissions:
       # Required for OIDC: this is what npm trusts in place of a token, and
       # what signs the provenance attestation.
