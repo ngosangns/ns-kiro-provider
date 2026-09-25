@@ -24,6 +24,20 @@ export function getKiroCliDbPath(): string | undefined {
   return existsSync(dbPath) ? dbPath : undefined;
 }
 
+/**
+ * Read only the explicitly typed External IdP record, including an expired
+ * access token so request-header classification still works during refresh.
+ */
+export function getKiroCliExternalIdpCredentials(): KiroCredentials | undefined {
+  const dbPath = getKiroCliDbPath();
+  if (!dbPath) return undefined;
+  try {
+    return tryKiroCliToken(dbPath, EXTERNAL_IDP_TOKEN_KEY, "external-idp", true);
+  } catch {
+    return undefined;
+  }
+}
+
 function getNodeSqlite(): typeof import("node:sqlite") | undefined {
   try {
     return require("node:sqlite") as typeof import("node:sqlite");
