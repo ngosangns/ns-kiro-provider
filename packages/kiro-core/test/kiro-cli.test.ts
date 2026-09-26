@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getKiroCliCredentials, getKiroCliDbPath, refreshViaKiroCli, tryKiroCliToken } from "../src/kiro-cli.js";
+import { getKiroCliCredentials, refreshViaKiroCli, tryKiroCliToken } from "../src/kiro-cli.js";
 
 let tempDir: string | undefined;
 afterEach(() => {
@@ -142,15 +142,6 @@ describe("external IdP tokens", () => {
 });
 
 describe("Feature 4: kiro-cli Credential Fallback", () => {
-  describe("getKiroCliDbPath", () => {
-    it("returns undefined when database does not exist", () => {
-      // Default: no kiro-cli installed
-      const result = getKiroCliDbPath();
-      // Either undefined (no file) or a string (if kiro-cli happens to be installed)
-      expect(result === undefined || typeof result === "string").toBe(true);
-    });
-  });
-
   describe("getKiroCliCredentials", () => {
     it("returns undefined or credentials when database may exist", () => {
       const result = getKiroCliCredentials();

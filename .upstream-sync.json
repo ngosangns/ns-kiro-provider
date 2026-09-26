@@ -223,6 +223,14 @@
       "what": "Estimate chỉ chạy khi host truyền KiroStreamRequest.usageTracking (opt-in, mặc định KIRO_USAGE_TRACKING_DISABLED). Không có loadKiroUsageTracking — host tự resolve settings rồi truyền resolveKiroUsageTracking(section). Upstream đọc ~/.pi/agent/settings.json trong extension.",
       "why": "kiro-core host-neutral: không đọc file của host cụ thể. Cả OMP lẫn dsh hiện chưa truyền usageTracking nên estimation mặc định tắt — đúng ý upstream (opt-in).",
       "risk": "Khi một host muốn bật, nó resolve section 'usageTracking' của chính nó qua resolveKiroUsageTracking rồi truyền vào request. Test: packages/kiro-core/test/usage-tracking.test.ts, cache-estimator.test.ts, stream.test.ts (nhóm estimate)."
+    },
+    {
+      "path": "packages/kiro-core/src/kiro-cli.ts (getKiroCliDbPath)",
+      "upstreamPath": "src/kiro-cli.ts",
+      "since": "2026-09-26",
+      "what": "Trên Windows, dò lần lượt %LOCALAPPDATA%\\Kiro-Cli\\data.sqlite3 rồi mới tới %APPDATA%\\kiro-cli\\data.sqlite3 (layout cũ); trước đây chỉ đọc path Roaming.",
+      "why": "kiro-cli 2.x đặt home — store SQLite gồm cả token — dưới %LOCALAPPDATA%\\Kiro-Cli, cạnh binary mà installer bung ra; trên máy có CLI này %APPDATA%\\kiro-cli không tồn tại. Đọc sai path nghĩa là resolveKiroCredentials() trả undefined dù kiro-cli đã login, và mọi request rơi về token cũ trong store của host -> 403 ListAvailableProfiles (probe us-east-1 rồi eu-central-1) dù model vẫn hiện trong /model. Upstream dính y hệt (kiểm 2026-09-26): cùng một nhánh win32, chỉ đọc path Roaming.",
+      "risk": "Nếu upstream sửa path theo cách khác (ví dụ đọc KIRO_HOME/KIRO_DATA_DIR mà binary kiro-cli có hỗ trợ), đối chiếu trước khi port đè. Giữ hành vi bằng packages/kiro-core/test/kiro-cli-store-path.test.ts (mock node:os theo platform, phủ cả macOS/Linux)."
     }
   ]
 }

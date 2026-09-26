@@ -14,14 +14,27 @@ const require = createRequire(import.meta.url);
 /** kiro-cli's secret-store key for an enterprise external IdP (OIDC) session. */
 const EXTERNAL_IDP_TOKEN_KEY = "kirocli:external-idp:token";
 
+/**
+ * The credential store kiro-cli actually writes, or undefined when none exists.
+ *
+ * Windows is the only platform where the layout moved: the 2.x CLI keeps its
+ * home — store included — under `%LOCALAPPDATA%\Kiro-Cli`, beside the binary the
+ * installer unpacks there, while older builds used `%APPDATA%\kiro-cli`. Both
+ * are probed, because reading only the legacy path reports "no kiro-cli
+ * session" on a machine whose CLI is logged in, and every request then falls
+ * back to the host's own — possibly exhausted — token.
+ */
 export function getKiroCliDbPath(): string | undefined {
   const p = platform();
-  let dbPath: string;
-  if (p === "win32")
-    dbPath = join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), "kiro-cli", "data.sqlite3");
-  else if (p === "darwin") dbPath = join(homedir(), "Library", "Application Support", "kiro-cli", "data.sqlite3");
-  else dbPath = join(homedir(), ".local", "share", "kiro-cli", "data.sqlite3");
-  return existsSync(dbPath) ? dbPath : undefined;
+  const localAppData = process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
+  const roamingAppData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
+  const candidates =
+    p === "win32"
+      ? [join(localAppData, "Kiro-Cli", "data.sqlite3"), join(roamingAppData, "kiro-cli", "data.sqlite3")]
+      : p === "darwin"
+        ? [join(homedir(), "Library", "Application Support", "kiro-cli", "data.sqlite3")]
+        : [join(homedir(), ".local", "share", "kiro-cli", "data.sqlite3")];
+  return candidates.find((candidate) => existsSync(candidate));
 }
 
 /**
