@@ -11,7 +11,7 @@
 
 import { formatSafeError } from "./debug.js";
 import { resolveApiRegion } from "./endpoints.js";
-import { getKiroIdeCredentials } from "./kiro-ide.js";
+import { getKiroIdeCredentials, getKiroIdeCredentialsAllowExpired } from "./kiro-ide.js";
 
 export const SSO_OIDC_ENDPOINT = "https://oidc.us-east-1.amazonaws.com";
 export const BUILDER_ID_START_URL = "https://view.awsapps.com/start";
@@ -47,6 +47,35 @@ export interface KiroCredentials {
 }
 
 export const KIRO_DESKTOP_USER_AGENT = "Kiro-Desktop/0.2.13 (darwin; arm64)";
+
+/**
+ * Which of this machine's two Kiro sessions the provider signs in with.
+ *
+ * `kiro-cli` and the Kiro IDE store independent logins, and those logins can be
+ * different IdC users of the same Kiro profile — one out of monthly requests
+ * while the other still has credits. `cli` (the default) signs in with the
+ * kiro-cli store and treats the IDE's session as a fallback; `ide` is the
+ * reverse, for a machine whose IDE holds the session the user actually wants.
+ */
+export type KiroAuthSource = "cli" | "ide";
+
+const AUTH_SOURCE_ENV = "KIRO_AUTH_SOURCE";
+
+/**
+ * Read {@link KiroAuthSource} from the environment.
+ *
+ * An unrecognized value is reported and treated as the default rather than
+ * silently obeyed: a typo that quietly signs the machine in as the other
+ * account would surface as the wrong account's quota, which is the failure this
+ * setting exists to avoid.
+ */
+export function resolveKiroAuthSource(): KiroAuthSource {
+  const configured = process.env[AUTH_SOURCE_ENV]?.trim().toLowerCase();
+  if (!configured) return "cli";
+  if (configured === "cli" || configured === "ide") return configured;
+  console.warn(`[kiro-core] Ignoring ${AUTH_SOURCE_ENV}=${configured}: expected "cli" or "ide".`);
+  return "cli";
+}
 
 export function kiroUserAgent(service: string, sdkVersion: string): Record<string, string> {
   return {
@@ -177,22 +206,35 @@ async function refreshKiroTokenInternal(credentials: KiroCredentials): Promise<K
   // refresh. Return them unchanged so the same key keeps being used.
   if (credentials.authMethod === "apikey" || isApiKey(credentials.access)) return credentials;
 
-  // Kiro IDE credentials are IDC credentials. Only consult them for IDC
-  // credential refresh — never replace a stored social/desktop session with
-  // the IDE's potentially unrelated account.
-  if (credentialAuthMethod === "idc") {
-    const ideCreds = getKiroIdeCredentials();
-    if (ideCreds) return ideCreds;
-  }
+  // Both stores hold IDC logins against the same Kiro profile, but they need not
+  // be the same user: the IDE can be signed into one that has run out of monthly
+  // requests while the kiro-cli session still has credits. A fresh session may
+  // therefore replace this credential only when it is the *same login*; a
+  // credential that is neither store's current login (an older host-held one)
+  // follows KIRO_AUTH_SOURCE instead. A social/desktop session is never replaced
+  // by either IDC session.
+  const cliSession = getValidCliCredentials();
+  const cliStaleSession = getExpiredCliCredentials();
+  const ideSession = credentialAuthMethod === "idc" ? getKiroIdeCredentials() : undefined;
+  const ideStaleSession = credentialAuthMethod === "idc" ? getKiroIdeCredentialsAllowExpired() : undefined;
 
-  // Prefer a fresh CLI token only when it belongs to the same auth family.
-  const preCheckCreds = getValidCliCredentials();
-  if (preCheckCreds) return preCheckCreds;
+  const cliIsThisLogin = (cliSession ?? cliStaleSession)?.refresh === credentials.refresh;
+  const ideIsThisLogin = (ideSession ?? ideStaleSession)?.refresh === credentials.refresh;
+  const replacement = cliIsThisLogin
+    ? cliSession
+    : ideIsThisLogin
+      ? ideSession
+      : resolveKiroAuthSource() === "ide"
+        ? (ideSession ?? cliSession)
+        : (cliSession ?? ideSession);
+  if (replacement) return replacement;
 
   try {
     const refreshed = await refreshKiroTokenDirect(credentials);
-    // Write refreshed tokens back to kiro-cli's store so both stay in sync.
-    saveKiroCliCredentials(refreshed);
+    // Write refreshed tokens back to kiro-cli's store so both stay in sync —
+    // except when this credential is the IDE's own login, whose token would
+    // otherwise take over the kiro-cli session it is unrelated to.
+    if (!ideIsThisLogin) saveKiroCliCredentials(refreshed);
     return refreshed;
   } catch (refreshError) {
     // The CLI may have rotated the refresh token between the pre-check and the
@@ -200,11 +242,14 @@ async function refreshKiroTokenInternal(credentials: KiroCredentials): Promise<K
     const retryCreds = getValidCliCredentials();
     if (retryCreds) return retryCreds;
 
-    // The CLI may have a newer refresh token with an expired access token.
-    const expiredCliCreds = getExpiredCliCredentials();
-    if (expiredCliCreds && expiredCliCreds.refresh !== credentials.refresh) {
+    // The CLI may have a newer refresh token with an expired access token. The
+    // stale session read for the pre-check is reused rather than read again: a
+    // rotation during the call is already caught by the fresh re-read above, and
+    // one read per store per refresh keeps this path from touching the store
+    // twice.
+    if (cliStaleSession && cliStaleSession.refresh !== credentials.refresh) {
       try {
-        const refreshedFromCli = await refreshKiroTokenDirect(expiredCliCreds);
+        const refreshedFromCli = await refreshKiroTokenDirect(cliStaleSession);
         saveKiroCliCredentials(refreshedFromCli);
         return refreshedFromCli;
       } catch {
@@ -327,17 +372,40 @@ async function refreshKiroTokenDirect(credentials: KiroCredentials): Promise<Kir
 
 /**
  * Resolve a usable session from the stores this machine already has: the
- * kiro-cli database first, then the Kiro IDE's token file. Expired material is
- * accepted and refreshed rather than rejected, because a refresh token outlives
- * its access token and rejecting here would ask the user to log in again for a
- * session that is still good.
+ * kiro-cli database first, then the Kiro IDE's token file — or the reverse when
+ * {@link KiroAuthSource} says so. The preferred store's own session is used or
+ * refreshed before the other store's is consulted at all, because the two are
+ * separate logins that can belong to different users of the same Kiro profile:
+ * switching users just because the preferred token aged out bills whatever the
+ * other account's quota happens to be. Expired material is accepted and
+ * refreshed rather than rejected, because a refresh token outlives its access
+ * token and rejecting here would ask the user to log in again for a session that
+ * is still good.
  */
 export async function resolveKiroCredentials(): Promise<KiroCredentials | undefined> {
   const { getKiroCliCredentials, getKiroCliCredentialsAllowExpired } = await import("./kiro-cli.js");
-  const fresh = getKiroCliCredentials() ?? getKiroIdeCredentials();
-  if (fresh) return fresh;
+  const stores =
+    resolveKiroAuthSource() === "ide"
+      ? [
+          { fresh: getKiroIdeCredentials(), stale: getKiroIdeCredentialsAllowExpired() },
+          { fresh: getKiroCliCredentials(), stale: getKiroCliCredentialsAllowExpired() },
+        ]
+      : [
+          { fresh: getKiroCliCredentials(), stale: getKiroCliCredentialsAllowExpired() },
+          { fresh: getKiroIdeCredentials(), stale: getKiroIdeCredentialsAllowExpired() },
+        ];
 
-  const stale = getKiroCliCredentialsAllowExpired();
-  if (!stale) return undefined;
-  return refreshKiroToken(stale);
+  let lastFailure: unknown;
+  for (const { fresh, stale } of stores) {
+    if (fresh) return fresh;
+    if (!stale) continue;
+    try {
+      return await refreshKiroToken(stale);
+    } catch (error) {
+      lastFailure = error;
+      console.warn(`[kiro-core] Kiro session refresh failed: ${formatSafeError(error)}`);
+    }
+  }
+  if (lastFailure) throw lastFailure;
+  return undefined;
 }

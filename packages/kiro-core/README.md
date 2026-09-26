@@ -19,7 +19,11 @@ adapters below — not meant to be installed on its own.
   `usage.output` from a tiktoken estimate.
 - **Credentials** — reads the kiro-cli SQLite store and the Kiro IDE token file,
   refreshes IDC / desktop / external-IdP / API-key sessions, and writes
-  refreshes back so kiro-cli stays on the same token.
+  refreshes back so kiro-cli stays on the same token. Both stores can be signed
+  into *different* IdC users of the same Kiro profile, so the kiro-cli session is
+  used and refreshed first, and the IDE's only when kiro-cli holds nothing;
+  `KIRO_AUTH_SOURCE=ide` reverses that for a machine whose IDE login is the one
+  to use.
 - **Streaming** — AWS event-stream framing, thinking-tag parsing, native and
   text-dialect tool-call recovery, history validation and repair, and the whole
   retry ladder (transport timeouts, capacity pressure, request-rate windows, 403

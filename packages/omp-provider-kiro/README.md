@@ -49,7 +49,12 @@ upstream shows up without a release here.
 - Reasoning effort maps onto Kiro's own ladder per model — `xhigh` and `max`
   exist only where the model advertises them, and a request for more thinking
   than a model offers is clamped rather than rejected.
-- Usage (`/settings`) reports the account's Kiro credit balance.
+- Usage (`/settings`) reports the account's Kiro credit balance — the one the
+  host is signed in with, so run `/login kiro` after signing the machine into a
+  different account.
+- Sessions come from the machine: the kiro-cli store first, the Kiro IDE's token
+  file as a fallback. They can be different IdC users of the same Kiro profile,
+  so `KIRO_AUTH_SOURCE=ide` switches a machine over to the IDE's login instead.
 - `KIRO_API_KEY` is read as a fallback when no session is stored.
 - `KIRO_DEBUG=1` writes a full request/response trace to
   `~/.ns-kiro-provider/logs/kiro-debug.log`, with credentials redacted.

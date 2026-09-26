@@ -1,8 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getKiroCliSocialToken } from "../src/kiro-cli.js";
-import { getKiroIdeCredentials } from "../src/kiro-ide.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getKiroCliCredentials,
+  getKiroCliCredentialsAllowExpired,
+  getKiroCliSocialToken,
+  saveKiroCliCredentials,
+} from "../src/kiro-cli.js";
+import { getKiroIdeCredentials, getKiroIdeCredentialsAllowExpired } from "../src/kiro-ide.js";
 import type { KiroCredentials } from "../src/oauth.js";
-import { refreshKiroToken } from "../src/oauth.js";
+import { refreshKiroToken, resolveKiroCredentials } from "../src/oauth.js";
 
 // Mock kiro-cli to prevent fallback to real credentials
 vi.mock("../src/kiro-cli.js", () => ({
@@ -344,5 +349,112 @@ describe("Feature 3: OAuth — Token Refresh", () => {
     expect(creds.access).toBe("social_at");
     expect(creds.authMethod).toBe("desktop");
     expect(creds.region).toBe("us-east-1");
+  });
+});
+
+describe("sign-in source", () => {
+  const cliLogin: KiroCredentials = {
+    refresh: "cli_rt|cli_cid|cli_csec|idc",
+    access: "cli_at",
+    expires: Date.now() + 3_600_000,
+    clientId: "cli_cid",
+    clientSecret: "cli_csec",
+    region: "us-east-1",
+    authMethod: "idc",
+  };
+  const ideLogin: KiroCredentials = {
+    refresh: "ide_rt|ide_cid|ide_csec|idc",
+    access: "ide_at",
+    expires: Date.now() + 3_600_000,
+    clientId: "ide_cid",
+    clientSecret: "ide_csec",
+    region: "us-east-1",
+    authMethod: "idc",
+  };
+
+  beforeEach(() => {
+    delete process.env.KIRO_AUTH_SOURCE;
+    vi.mocked(getKiroCliCredentials).mockReset().mockReturnValue(cliLogin);
+    vi.mocked(getKiroCliCredentialsAllowExpired).mockReset();
+    vi.mocked(getKiroIdeCredentials).mockReset().mockReturnValue(ideLogin);
+    vi.mocked(getKiroIdeCredentialsAllowExpired).mockReset();
+    vi.mocked(saveKiroCliCredentials).mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env.KIRO_AUTH_SOURCE;
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps refreshing the kiro-cli login instead of adopting the IDE's", async () => {
+    const refreshed = (await refreshKiroToken(cliLogin)) as KiroCredentials;
+    expect(refreshed.access).toBe("cli_at");
+    expect(refreshed.refresh).toContain("cli_cid");
+  });
+
+  it("resolves the IDE login when KIRO_AUTH_SOURCE=ide, the kiro-cli login otherwise", async () => {
+    expect((await resolveKiroCredentials())?.access).toBe("cli_at");
+
+    process.env.KIRO_AUTH_SOURCE = "ide";
+    expect((await resolveKiroCredentials())?.access).toBe("ide_at");
+  });
+
+  it("ignores an unrecognized KIRO_AUTH_SOURCE and keeps the default", async () => {
+    process.env.KIRO_AUTH_SOURCE = "oidc";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect((await resolveKiroCredentials())?.access).toBe("cli_at");
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("refreshes a stale kiro-cli session rather than adopting the IDE's fresh one", async () => {
+    // The kiro-cli token ages out hourly while the IDE keeps its own fresh; the
+    // machine must stay on the kiro-cli login it was already using.
+    vi.mocked(getKiroCliCredentials).mockReturnValue(undefined);
+    vi.mocked(getKiroCliCredentialsAllowExpired).mockReturnValue({ ...cliLogin, expires: Date.now() - 1_000 });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ accessToken: "cli_new_at", refreshToken: "cli_new_rt", expiresIn: 3600 }),
+      }),
+    );
+
+    const resolved = (await resolveKiroCredentials()) as KiroCredentials;
+    expect(resolved.access).toBe("cli_new_at");
+    expect(resolved.refresh).toContain("cli_cid");
+    expect(vi.mocked(saveKiroCliCredentials)).toHaveBeenCalled();
+  });
+
+  it("falls back to the IDE session when the machine has no kiro-cli session", async () => {
+    vi.mocked(getKiroCliCredentials).mockReturnValue(undefined);
+
+    const resolved = (await resolveKiroCredentials()) as KiroCredentials;
+    expect(resolved.access).toBe("ide_at");
+  });
+
+  it("does not write the IDE's login into the kiro-cli store", async () => {
+    // kiro-cli is signed in as someone else, with nothing fresh to offer, so the
+    // only refresheable session is the IDE's — which must stay out of that store.
+    vi.mocked(getKiroCliCredentials).mockReturnValue(undefined);
+    vi.mocked(getKiroCliCredentialsAllowExpired).mockReturnValue({
+      ...cliLogin,
+      refresh: "other_rt|other_cid|other_csec|idc",
+      expires: Date.now() - 1_000,
+    });
+    vi.mocked(getKiroIdeCredentials).mockReturnValue(undefined);
+    vi.mocked(getKiroIdeCredentialsAllowExpired).mockReturnValue(ideLogin);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ accessToken: "ide_new_at", refreshToken: "ide_new_rt", expiresIn: 3600 }),
+      }),
+    );
+
+    const refreshed = (await refreshKiroToken(ideLogin)) as KiroCredentials;
+    expect(refreshed.access).toBe("ide_new_at");
+    expect(vi.mocked(saveKiroCliCredentials)).not.toHaveBeenCalled();
   });
 });
