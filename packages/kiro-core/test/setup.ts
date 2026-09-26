@@ -10,6 +10,7 @@ const testHome = mkdtempSync(join(tmpdir(), "kiro-core-test-"));
 process.env.HOME = testHome;
 process.env.USERPROFILE = testHome;
 process.env.APPDATA = join(testHome, "AppData", "Roaming");
+process.env.LOCALAPPDATA = join(testHome, "AppData", "Local");
 process.env.PATH = testHome;
 
 // Each test file gets its own setup context and temporary home.
