@@ -95,10 +95,12 @@ export {
   isApiKey,
   isExpired,
   type KiroAuthMethod,
+  type KiroAuthSource,
   type KiroCredentials,
   kiroAuthHeaders,
   loginKiroWithApiKey,
   refreshKiroToken,
+  resolveKiroAuthSource,
   resolveKiroCredentials,
 } from "./oauth.js";
 // The stages `streamKiro` runs in order. Exported so a caller can drive one on

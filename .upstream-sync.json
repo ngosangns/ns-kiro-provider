@@ -231,6 +231,14 @@
       "what": "Trên Windows, dò lần lượt %LOCALAPPDATA%\\Kiro-Cli\\data.sqlite3 rồi mới tới %APPDATA%\\kiro-cli\\data.sqlite3 (layout cũ); trước đây chỉ đọc path Roaming.",
       "why": "kiro-cli 2.x đặt home — store SQLite gồm cả token — dưới %LOCALAPPDATA%\\Kiro-Cli, cạnh binary mà installer bung ra; trên máy có CLI này %APPDATA%\\kiro-cli không tồn tại. Đọc sai path nghĩa là resolveKiroCredentials() trả undefined dù kiro-cli đã login, và mọi request rơi về token cũ trong store của host -> 403 ListAvailableProfiles (probe us-east-1 rồi eu-central-1) dù model vẫn hiện trong /model. Upstream dính y hệt (kiểm 2026-09-26): cùng một nhánh win32, chỉ đọc path Roaming.",
       "risk": "Nếu upstream sửa path theo cách khác (ví dụ đọc KIRO_HOME/KIRO_DATA_DIR mà binary kiro-cli có hỗ trợ), đối chiếu trước khi port đè. Giữ hành vi bằng packages/kiro-core/test/kiro-cli-store-path.test.ts (mock node:os theo platform, phủ cả macOS/Linux)."
+    },
+    {
+      "path": "packages/kiro-core/src/oauth.ts (refreshKiroTokenInternal, resolveKiroCredentials)",
+      "upstreamPath": "src/oauth.ts",
+      "since": "2026-09-26",
+      "what": "Session kiro-cli được dùng và refresh TRƯỚC session của Kiro IDE; một credential chỉ bị thay bằng session của chính login đó (so khớp refresh token), credential không thuộc store nào thì theo KIRO_AUTH_SOURCE (mặc định cli, giá trị `ide` đảo thứ tự). Thêm env KIRO_AUTH_SOURCE + export resolveKiroAuthSource/KiroAuthSource. Lần refresh của login IDE không ghi ngược vào store kiro-cli nữa.",
+      "why": "Upstream ưu tiên IDE: `if (idc) { const ideCreds = getKiroIdeCredentials(); if (ideCreds) return ideCreds; }` rồi mới tới CLI, và resolveKiroCredentials() lấy `getKiroCliCredentials() ?? getKiroIdeCredentials()` nên session IDE *fresh* thắng session kiro-cli đã hết hạn. Hai store là hai login IdC khác nhau có thể thuộc hai user của cùng một Kiro profile: trên máy anh.le, IDE là user đã hết MONTHLY_REQUEST_COUNT còn kiro-cli còn >3k credit (đã đo: cùng ARN profile, token IDE ~429 'You have reached the limit', token kiro-cli chạy tốt). Hậu quả: request đổi user khi token kiro-cli hết hạn (1h), và credential host lưu bị 'di cư' sang user của IDE nên panel usage hiện quota của account khác.",
+      "risk": "Nếu upstream đổi thứ tự ưu tiên theo cách khác (hoặc thêm option tương đương), đối chiếu trước khi port đè — đừng để mất tính chất 'không tự đổi user giữa session'. Giữ hành vi bằng packages/kiro-core/test/oauth.test.ts, describe 'sign-in source' (5 case, đều fail trên code cũ)."
     }
   ]
 }
