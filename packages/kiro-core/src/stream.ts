@@ -34,6 +34,7 @@ import {
   retryConfig,
 } from "./retry.js";
 import { kiroTokenTypeHeaders } from "./token-type.js";
+import { kiroToolNameAliases } from "./transform.js";
 import { abortableDelay, createResponseHeaderDeadline, logCapacityEvent } from "./transport.js";
 import type { KiroEffort, KiroMessage, KiroStreamEvent, KiroTool } from "./types.js";
 import { estimateKiroCreditCost, KIRO_USAGE_TRACKING_DISABLED, type KiroUsageTracking } from "./usage-tracking.js";
@@ -304,7 +305,7 @@ export async function* streamKiro(request: KiroStreamRequest): AsyncGenerator<Ki
     systemPrompt = `<thinking_mode>enabled</thinking_mode><max_thinking_length>${budget}</max_thinking_length>${systemPrompt ? `\n${systemPrompt}` : ""}`;
   }
 
-  const assembler = new KiroResponseAssembler(model, thinkingEnabled);
+  const assembler = new KiroResponseAssembler(model, thinkingEnabled, kiroToolNameAliases(request.tools));
   const usageTracking = request.usageTracking ?? KIRO_USAGE_TRACKING_DISABLED;
   let retryCount = 0;
   const maxRetries = 3;

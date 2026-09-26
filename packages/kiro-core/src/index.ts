@@ -151,9 +151,11 @@ export {
   type KiroToolSpec,
   type KiroToolUse,
   type KiroUserInputMessage,
+  kiroToolNameAliases,
   normalizeMessages,
   relocateDisplacedToolResults,
   sanitizeSurrogates,
+  toKiroToolName,
   toKiroToolUseId,
 } from "./transform.js";
 export {

@@ -8,7 +8,7 @@ import { KiroApiError } from "../src/errors.js";
 import type { KiroModel } from "../src/models.js";
 import { capacityRetryConfig } from "../src/retry.js";
 import { type KiroStreamRequest, resetProfileArnCache, streamKiro } from "../src/stream.js";
-import { EMPTY_CONTENT_PLACEHOLDER } from "../src/transform.js";
+import { EMPTY_CONTENT_PLACEHOLDER, toKiroToolName } from "../src/transform.js";
 import type { KiroMessage, KiroStreamEvent } from "../src/types.js";
 import { KIRO_USAGE_TRACKING_DISABLED } from "../src/usage-tracking.js";
 import {
@@ -386,6 +386,51 @@ describe("streamKiro — tool calls", () => {
       arguments: { path: "/tmp/a" },
     });
     expect(events.find((e) => e.type === "done")).toMatchObject({ stopReason: "toolUse" });
+  });
+
+  it("sends a wire-legal spec name for an illegal tool name and reports the call under the host's name", async () => {
+    // Kiro rejects any spec name outside [a-zA-Z0-9_-]{1,64} with
+    // 400 "Invalid tool use format", so `mcp:fs:read` goes out sanitized; the
+    // tool call the model makes against it must come back under the name the
+    // host registered, or the host cannot dispatch it.
+    const wireName = toKiroToolName("mcp:fs:read");
+    const fetchMock = stubFetch(
+      makeOkResponse(
+        `{"name":"${wireName}","toolUseId":"t1","input":"{\\"path\\":\\"/a\\"}","stop":true}{"contextUsagePercentage":10}`,
+      ),
+    );
+    const events = await collect(
+      streamKiro(
+        makeRequest({
+          tools: [
+            {
+              name: "mcp:fs:read",
+              description: "read a file",
+              parameters: { type: "object", properties: { path: { type: "string" } } },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const uim = userInputMessage(fetchMock) as {
+      userInputMessageContext?: { tools?: Array<{ toolSpecification: { name: string } }> };
+    };
+    expect(uim.userInputMessageContext?.tools?.[0]?.toolSpecification.name).toBe(wireName);
+    expect(wireName).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+    expect(events.find((e) => e.type === "tool_call_end")).toMatchObject({
+      name: "mcp:fs:read",
+      arguments: { path: "/a" },
+    });
+  });
+
+  it("passes a wire name the host never declared straight through", async () => {
+    stubFetch(
+      makeOkResponse('{"name":"mystery_tool","toolUseId":"t7","input":"{}","stop":true}{"contextUsagePercentage":10}'),
+    );
+    const events = await collect(streamKiro(makeRequest()));
+
+    expect(events.find((e) => e.type === "tool_call_end")).toMatchObject({ name: "mystery_tool" });
   });
 
   it("assembles tool input split across frames and reader chunks", async () => {

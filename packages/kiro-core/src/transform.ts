@@ -82,6 +82,46 @@ export function toKiroToolUseId(toolUseId: string): string {
   return `pi_${digest}`;
 }
 
+/**
+ * Kiro's tool-name contract, probed against the live service (2026-09-27): any
+ * name outside this shape is rejected before the turn runs with
+ * `400 {"message":"Invalid tool use format."}` — colons, dots, spaces,
+ * non-ASCII, and names over 64 characters all fail, while a leading digit, a
+ * hyphen, and an underscore are accepted. The ID pattern above deliberately
+ * does NOT apply: it admits `:` and `.`, both rejected here.
+ */
+const KIRO_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/**
+ * Project a host's tool name onto the wire-legal space, deterministically so a
+ * name sanitizes identically in the spec catalog and in history `toolUses` of
+ * the same request and every later one. The digest suffix keeps distinct names
+ * distinct after the character rewrite collapses them (`a:b` vs `a.b`), and
+ * keeps a >64-char name unique after truncation. The caller maps emitted tool
+ * calls back through {@link kiroToolNameAliases}.
+ */
+export function toKiroToolName(name: string): string {
+  if (KIRO_TOOL_NAME_PATTERN.test(name)) return name;
+  const clean = name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 55);
+  const digest = createHash("sha256").update(name).digest("base64url").slice(0, 8);
+  return `${clean || "tool"}_${digest}`;
+}
+
+/**
+ * Wire name → host name for every tool whose name {@link toKiroToolName}
+ * changed, so a tool call Kiro echoes back under the sanitized alias is
+ * reported to the host under the name it actually registered. Names that were
+ * already legal need no entry — the wire form IS the host form.
+ */
+export function kiroToolNameAliases(tools: readonly KiroTool[] | undefined): Map<string, string> {
+  const aliases = new Map<string, string>();
+  for (const tool of tools ?? []) {
+    const wire = toKiroToolName(tool.name);
+    if (wire !== tool.name) aliases.set(wire, tool.name);
+  }
+  return aliases;
+}
+
 export function normalizeMessages(messages: KiroMessage[]): KiroMessage[] {
   return messages.filter((msg) => {
     if (msg.role !== "assistant") return true;
@@ -151,12 +191,27 @@ export function getContentText(msg: KiroMessage): string {
     .join("");
 }
 
+/**
+ * Bedrock requires a tool's root schema to declare `type: "object"` and rejects
+ * the whole request otherwise (`REQUEST_BODY_INVALID`). A host may hand a
+ * bare `{}` — valid JSON Schema, and the natural spelling of a no-argument
+ * tool — so a missing `type` is filled in rather than relayed verbatim. A
+ * schema that already declares one is passed through untouched, whatever it
+ * says: the host's declaration wins over a guess here.
+ */
+function toKiroInputSchema(parameters: Record<string, unknown>): Record<string, unknown> {
+  if (parameters && typeof parameters === "object" && !Array.isArray(parameters)) {
+    return parameters.type === undefined ? { type: "object", ...parameters } : parameters;
+  }
+  return { type: "object", properties: {} };
+}
+
 export function convertToolsToKiro(tools: KiroTool[]): KiroToolSpec[] {
   return tools.map((tool) => ({
     toolSpecification: {
-      name: tool.name,
+      name: toKiroToolName(tool.name),
       description: tool.description,
-      inputSchema: { json: tool.parameters },
+      inputSchema: { json: toKiroInputSchema(tool.parameters) },
     },
   }));
 }
@@ -244,7 +299,7 @@ export function buildHistory(
           armHadBlocks = true;
         } else if (block.type === "toolCall") {
           armToolUses.push({
-            name: block.name,
+            name: toKiroToolName(block.name),
             toolUseId: toKiroToolUseId(block.id),
             input: block.arguments,
           });

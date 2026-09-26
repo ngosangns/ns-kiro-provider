@@ -5,10 +5,12 @@ import {
   convertImagesToKiro,
   convertToolsToKiro,
   getContentText,
+  kiroToolNameAliases,
   normalizeMessages,
   relocateDisplacedToolResults,
   sanitizeSurrogates,
   TOOL_RESULT_LIMIT,
+  toKiroToolName,
   truncate,
 } from "../src/transform.js";
 import type {
@@ -111,6 +113,62 @@ describe("Feature 5: Message Transformation", () => {
       expect(r[0].toolSpecification.name).toBe("bash");
       expect(r[0].toolSpecification.inputSchema.json).toEqual(tools[0].parameters);
     });
+
+    it("writes a wire-legal name for a tool whose own name Kiro rejects", () => {
+      const r = convertToolsToKiro([{ name: "mcp:fs:read", description: "read", parameters: { type: "object" } }]);
+      expect(r[0].toolSpecification.name).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+      expect(r[0].toolSpecification.name).not.toBe("mcp:fs:read");
+    });
+
+    it("declares type object on a bare schema, and leaves a declared type alone", () => {
+      const [bare, declared] = convertToolsToKiro([
+        { name: "noop", description: "", parameters: {} },
+        { name: "read", description: "", parameters: { type: "object", properties: { p: { type: "string" } } } },
+      ]);
+      expect(bare.toolSpecification.inputSchema.json).toEqual({ type: "object" });
+      expect(declared.toolSpecification.inputSchema.json).toEqual({
+        type: "object",
+        properties: { p: { type: "string" } },
+      });
+    });
+  });
+
+  describe("toKiroToolName", () => {
+    const legal = /^[a-zA-Z0-9_-]{1,64}$/;
+
+    it("returns legal names unchanged", () => {
+      for (const name of ["bash", "read_file", "a-b", "1abc", "a".repeat(64)]) {
+        expect(toKiroToolName(name)).toBe(name);
+      }
+    });
+
+    it("sanitizes every name Kiro rejects: colons, dots, spaces, non-ASCII, over 64 chars", () => {
+      for (const name of ["mcp:fs:read", "mcp.fs.read", "a b", "café", "x".repeat(65)]) {
+        expect(toKiroToolName(name)).toMatch(legal);
+        expect(toKiroToolName(name)).not.toBe(name);
+      }
+    });
+
+    it("is deterministic, and keeps distinct names distinct after the rewrite collapses them", () => {
+      expect(toKiroToolName("a:b")).toBe(toKiroToolName("a:b"));
+      expect(toKiroToolName("a:b")).not.toBe(toKiroToolName("a.b"));
+      expect(toKiroToolName(`${"y".repeat(70)}1`)).not.toBe(toKiroToolName(`${"y".repeat(70)}2`));
+    });
+
+    it("still yields a legal name when nothing survives the rewrite", () => {
+      expect(toKiroToolName(":::…")).toMatch(legal);
+    });
+  });
+
+  describe("kiroToolNameAliases", () => {
+    it("maps only names the wire form changed, back to the host's name", () => {
+      const aliases = kiroToolNameAliases([
+        { name: "bash", description: "", parameters: {} },
+        { name: "mcp:fs:read", description: "", parameters: {} },
+      ]);
+      expect(aliases.size).toBe(1);
+      expect(aliases.get(toKiroToolName("mcp:fs:read"))).toBe("mcp:fs:read");
+    });
   });
 
   describe("convertImagesToKiro", () => {
@@ -140,6 +198,15 @@ describe("Feature 5: Message Transformation", () => {
       const { history } = buildHistory(msgs, "M");
       const entry = history.find((h) => h.assistantResponseMessage?.toolUses);
       expect(entry?.assistantResponseMessage?.toolUses?.[0].name).toBe("bash");
+    });
+
+    it("sanitizes a history toolUse name the same way the spec catalog does", () => {
+      const a = assistant("");
+      a.content = [{ type: "toolCall", id: "tc1", name: "mcp:fs:read", arguments: {} }];
+      const msgs: KiroMessage[] = [user("go"), a, toolResult("tc1", "ok"), user("next")];
+      const { history } = buildHistory(msgs, "M");
+      const entry = history.find((h) => h.assistantResponseMessage?.toolUses);
+      expect(entry?.assistantResponseMessage?.toolUses?.[0].name).toBe(toKiroToolName("mcp:fs:read"));
     });
 
     it("batches consecutive tool results", () => {

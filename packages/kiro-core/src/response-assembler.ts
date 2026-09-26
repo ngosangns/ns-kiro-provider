@@ -90,7 +90,18 @@ export class KiroResponseAssembler {
   constructor(
     private readonly model: KiroModel,
     private readonly thinkingEnabled: boolean,
+    /**
+     * Wire name → host name for tools `toKiroToolName` had to rename on the
+     * request. Applied at ingest so every downstream read — emitted events and
+     * the dropped-call diagnostic alike — reports the name the host
+     * registered, not the alias the wire required.
+     */
+    private readonly toolNameAliases?: ReadonlyMap<string, string>,
   ) {}
+
+  private originalToolName(name: string): string {
+    return this.toolNameAliases?.get(name) ?? name;
+  }
 
   /** Clear per-attempt state. Only block indexes are kept. */
   beginAttempt(): void {
@@ -177,7 +188,7 @@ export class KiroResponseAssembler {
         this.sawAnyToolCalls = true;
         if (!this.currentToolCall || this.currentToolCall.toolUseId !== tc.toolUseId) {
           this.flushToolCall();
-          this.currentToolCall = { toolUseId: tc.toolUseId, name: tc.name, input: "" };
+          this.currentToolCall = { toolUseId: tc.toolUseId, name: this.originalToolName(tc.name), input: "" };
         }
         this.currentToolCall.input += tc.input || "";
         if (tc.input) this.totalContent += tc.input;
@@ -426,7 +437,13 @@ export class KiroResponseAssembler {
     this.blocks.setText(this.textBlockIndex, text);
     this.sawAnyToolCalls = true;
     for (const call of recovered) {
-      if (this.emitToolCall({ toolUseId: call.toolUseId, name: call.name, input: JSON.stringify(call.arguments) })) {
+      if (
+        this.emitToolCall({
+          toolUseId: call.toolUseId,
+          name: this.originalToolName(call.name),
+          input: JSON.stringify(call.arguments),
+        })
+      ) {
         this.emittedToolCalls++;
       } else {
         // Unreachable as written, and kept deliberately. Both dialects hand
@@ -437,7 +454,7 @@ export class KiroResponseAssembler {
         // `JSON.parse` throw, cannot fire here. It stays so that a future
         // parser change passing raw text through cannot silently reintroduce
         // the very dropped-call blindness this change exists to remove.
-        this.droppedToolCalls.push(call.name);
+        this.droppedToolCalls.push(this.originalToolName(call.name));
       }
     }
   }

@@ -239,6 +239,14 @@
       "what": "Session kiro-cli được dùng và refresh TRƯỚC session của Kiro IDE; một credential chỉ bị thay bằng session của chính login đó (so khớp refresh token), credential không thuộc store nào thì theo KIRO_AUTH_SOURCE (mặc định cli, giá trị `ide` đảo thứ tự). Thêm env KIRO_AUTH_SOURCE + export resolveKiroAuthSource/KiroAuthSource. Lần refresh của login IDE không ghi ngược vào store kiro-cli nữa.",
       "why": "Upstream ưu tiên IDE: `if (idc) { const ideCreds = getKiroIdeCredentials(); if (ideCreds) return ideCreds; }` rồi mới tới CLI, và resolveKiroCredentials() lấy `getKiroCliCredentials() ?? getKiroIdeCredentials()` nên session IDE *fresh* thắng session kiro-cli đã hết hạn. Hai store là hai login IdC khác nhau có thể thuộc hai user của cùng một Kiro profile: trên máy anh.le, IDE là user đã hết MONTHLY_REQUEST_COUNT còn kiro-cli còn >3k credit (đã đo: cùng ARN profile, token IDE ~429 'You have reached the limit', token kiro-cli chạy tốt). Hậu quả: request đổi user khi token kiro-cli hết hạn (1h), và credential host lưu bị 'di cư' sang user của IDE nên panel usage hiện quota của account khác.",
       "risk": "Nếu upstream đổi thứ tự ưu tiên theo cách khác (hoặc thêm option tương đương), đối chiếu trước khi port đè — đừng để mất tính chất 'không tự đổi user giữa session'. Giữ hành vi bằng packages/kiro-core/test/oauth.test.ts, describe 'sign-in source' (5 case, đều fail trên code cũ)."
+    },
+    {
+      "path": "packages/kiro-core/src/transform.ts (toKiroToolName, kiroToolNameAliases, toKiroInputSchema), request-builder.ts, response-assembler.ts, stream.ts",
+      "upstreamPath": "src/transform.ts, src/stream.ts",
+      "since": "2026-09-27",
+      "what": "Tên tool được sanitize về [a-zA-Z0-9_-]{1,64} (hậu tố hash khi phải viết lại) ở spec catalog lẫn history toolUses; response map ngược wire->tên gốc qua kiroToolNameAliases truyền vào KiroResponseAssembler. Schema parameters thiếu `type` được điền `{type:\"object\"}`; parameters không phải object -> `{type:\"object\",properties:{}}`.",
+      "why": "Kiro reject 400 REQUEST_BODY_INVALID 'Invalid tool use format' trên mọi name ngoài pattern (đã probe live: `mcp:fs:read`, `a.b`, space, unicode, >64 ký tự đều fail; digit đầu/hyphen/underscore/64 ký tự OK) — host có tool kiểu MCP (`server:tool`, `server.tool`) fail ngay turn đầu (issue #15). Schema `{}` cũng 400 (Bedrock đòi root `type: object`). Upstream truyền nguyên name/parameters (kiểm 2026-09-27) nên dính cùng lỗi.",
+      "risk": "Nếu upstream tự sanitize theo scheme khác, đối chiếu để không đổi wire name đã phát hành (history cũ tham chiếu alias cũ vẫn phải giải được) — hash-suffix scheme là deterministic nên port chỉ cần giữ cùng hàm. Giữ hành vi bằng packages/kiro-core/test/transform.test.ts (toKiroToolName/kiroToolNameAliases) và stream.test.ts ('wire-legal spec name')."
     }
   ]
 }

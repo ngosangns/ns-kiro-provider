@@ -28,6 +28,7 @@ import {
   relocateDisplacedToolResults,
   sanitizeSurrogates,
   TOOL_RESULT_LIMIT,
+  toKiroToolName,
   toKiroToolUseId,
   truncate,
 } from "./transform.js";
@@ -122,7 +123,11 @@ export function buildKiroRequest(params: BuildKiroRequestParams): BuiltKiroReque
       // `<thinking>...</thinking>` writes literal markup into the string the
       // model reads back as its own prior speech.
       else if (block.type === "toolCall") {
-        armToolUses.push({ name: block.name, toolUseId: toKiroToolUseId(block.id), input: block.arguments });
+        armToolUses.push({
+          name: toKiroToolName(block.name),
+          toolUseId: toKiroToolUseId(block.id),
+          input: block.arguments,
+        });
       }
     }
     if (armContent || armToolUses.length > 0) {
